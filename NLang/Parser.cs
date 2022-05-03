@@ -60,7 +60,6 @@ namespace NLang
         {
             //Keywords
             if (statement.StartsWith("while")) return ParseWhile(statement);
-            if (statement.StartsWith("var")) return ParseAssign(statement);
             if (statement.StartsWith("print")) return ParsePrint(statement);
 
             //Literals
@@ -104,7 +103,7 @@ namespace NLang
                 }
                 else
                 {
-                    exp = new IfElseExpression(condition, body, new BlockExpression(new List<Expression> { new PrimitiveExpression(new Unit()) }));
+                    exp = new IfElseExpression(condition, body, new BlockExpression(new List<Expression> { new PrimitiveExpression(new Interpreter.Void()) }));
                     rest = bod.rest;
                 }
             }

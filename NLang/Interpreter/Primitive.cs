@@ -37,15 +37,15 @@ namespace NLang.Interpreter
 
         public override string ToString()
         {
-            return Value.ToString();
+            return Value.ToString().ToLower();
         }
     }
 
-    internal class Unit : Primitive
+    internal class Void : Primitive
     {
         public override string ToString()
         {
-            return "Unit";
+            return "void";
         }
     }
 }

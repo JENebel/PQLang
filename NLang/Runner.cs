@@ -26,16 +26,11 @@ namespace NLang
 
                 Primitive result = parsed.Evaluate(varEnv);
 
-                return "Returned: " + result switch
-                {
-                    Integer i => "Int: " + i.Value,
-                    Interpreter.Boolean b => "Bool: " + b.Value,
-                    Unit => "Unit"
-                };
+                return "Returned: " + result.ToString();
             }
             catch (Exception e)
             {
-                return e.Message;
+                return "Error! " + e.Message;
             }
         }
     }

@@ -1,5 +1,21 @@
-﻿var a = 2;
+﻿a = 10;
 
-a = 12 % 7;
+while (a > 0)
+{
+	a--;
+	if (a == 9)
+	{
+		b = 3
+	};
 
-a
+	if (a == 5) 
+	{
+		c = true
+	}
+	else
+	{
+		c = 2 + b
+	}
+};
+
+print(c);

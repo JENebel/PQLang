@@ -133,7 +133,7 @@ namespace NLang.Interpreter
             else
                 varEnv.Add(_varName, newVal);
 
-            return new Unit();
+            return new Void();
         }
     }
 
@@ -206,7 +206,7 @@ namespace NLang.Interpreter
                 _body.Evaluate(varEnv);
                 return new WhileExpression(_condition, _body).Evaluate(varEnv);
             }
-            else return new Unit();
+            else return new Void();
         }
     }
 
@@ -221,7 +221,7 @@ namespace NLang.Interpreter
 
         public override Primitive Evaluate(Dictionary<string, Primitive> varEnv)
         {
-            Primitive result = new Unit();
+            Primitive result = new Void();
 
             for (int i = 0; i < _body.Count; i++)
             {
@@ -245,7 +245,7 @@ namespace NLang.Interpreter
         {
             Console.WriteLine("Print: " + _toPrint.Evaluate(varEnv).ToString());
 
-            return new Unit();
+            return new Void();
         }
     }
 }
