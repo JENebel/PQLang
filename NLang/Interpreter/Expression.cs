@@ -11,7 +11,7 @@ namespace NLang.Interpreter
         public abstract Primitive Evaluate(Dictionary<string, Primitive> varEnv);
     }
 
-    internal enum Operator { Plus, Minus, Times, Divide, GreaterThan, LessThan, Equals, NotEquals, Not, And, Or }
+    internal enum Operator { Plus, PlusPlus, Minus, MinusMinus, Times, Divide, GreaterThan, LessThan, Equals, NotEquals, Not, And, Or, Modulo }
 
 
     internal class PrimitiveExpression : Expression
@@ -59,6 +59,7 @@ namespace NLang.Interpreter
                     Operator.LessThan => new Boolean(l.Value < r.Value),
                     Operator.Equals => new Boolean(l.Value == r.Value),
                     Operator.NotEquals => new Boolean(l.Value != r.Value),
+                    Operator.Modulo => new Integer(l.Value % r.Value),
                     _ => throw new Exception("Operator not valid for 2 integers")
                 },
 
@@ -96,6 +97,8 @@ namespace NLang.Interpreter
                 Integer i => _op switch
                 {
                     Operator.Minus => new Integer(-i.Value),
+                    Operator.PlusPlus => new Integer(i.Value + 1),
+                    Operator.MinusMinus => new Integer(i.Value - 1),
                     _ => throw new Exception("Operator not valid for 1 integer")
                 },
 
@@ -226,6 +229,23 @@ namespace NLang.Interpreter
             }
 
             return result;
+        }
+    }
+
+    internal class PrintExpression : Expression
+    {
+        Expression _toPrint;
+
+        public PrintExpression(Expression toPrint)
+        {
+            _toPrint = toPrint;
+        }
+
+        public override Primitive Evaluate(Dictionary<string, Primitive> varEnv)
+        {
+            Console.WriteLine("Print: " + _toPrint.Evaluate(varEnv).ToString());
+
+            return new Unit();
         }
     }
 }

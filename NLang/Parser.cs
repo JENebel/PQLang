@@ -61,8 +61,9 @@ namespace NLang
             //Keywords
             if (statement.StartsWith("while")) return ParseWhile(statement);
             if (statement.StartsWith("var")) return ParseAssign(statement);
+            if (statement.StartsWith("print")) return ParsePrint(statement);
 
-            //Lieterals
+            //Literals
             if (statement == "true") return new PrimitiveExpression(new Interpreter.Boolean(true));
             if (statement == "false") return new PrimitiveExpression(new Interpreter.Boolean(false));
             if (statement.Length > 0 && statement.All(char.IsDigit)) return new PrimitiveExpression(new Integer(int.Parse(statement)));
@@ -111,6 +112,14 @@ namespace NLang
             {
                 var next = NextPiece(statement.Trim());
                 if (next.piece.Length > 0 && next.piece.All(char.IsLetter) && next.rest.StartsWith("=") && !next.rest.StartsWith("==")) return new AssignmentExpression(next.piece, ParseStatement(next.rest.Substring(1).Trim()));
+                if (next.rest == "++") return new AssignmentExpression(next.piece, new UnaryExpression(new VariableLookupExpression(next.piece), Operator.PlusPlus));
+                if (next.rest == "--") return new AssignmentExpression(next.piece, new UnaryExpression(new VariableLookupExpression(next.piece), Operator.MinusMinus));
+                if (next.rest.StartsWith("+=")) return new AssignmentExpression(next.piece, new BinaryExpression(new VariableLookupExpression(next.piece), Operator.Plus, ParseStatement(next.rest.Substring(2).Trim())));
+                if (next.rest.StartsWith("-=")) return new AssignmentExpression(next.piece, new BinaryExpression(new VariableLookupExpression(next.piece), Operator.Minus, ParseStatement(next.rest.Substring(2).Trim())));
+                if (next.rest.StartsWith("*=")) return new AssignmentExpression(next.piece, new BinaryExpression(new VariableLookupExpression(next.piece), Operator.Times, ParseStatement(next.rest.Substring(2).Trim())));
+                if (next.rest.StartsWith("/=")) return new AssignmentExpression(next.piece, new BinaryExpression(new VariableLookupExpression(next.piece), Operator.Divide, ParseStatement(next.rest.Substring(2).Trim())));
+
+
 
                 exp = ParseStatement(next.piece);
                 rest = next.rest;
@@ -125,6 +134,7 @@ namespace NLang
             if (rest.StartsWith("/")) return new BinaryExpression(exp, Operator.Divide, ParseStatement(rest.Substring(1).Trim()));
             if (rest.StartsWith(">")) return new BinaryExpression(exp, Operator.GreaterThan, ParseStatement(rest.Substring(1).Trim()));
             if (rest.StartsWith("<")) return new BinaryExpression(exp, Operator.LessThan, ParseStatement(rest.Substring(1).Trim()));
+            if (rest.StartsWith("%")) return new BinaryExpression(exp, Operator.Modulo, ParseStatement(rest.Substring(1).Trim()));
             if (rest.StartsWith("==")) return new BinaryExpression(exp, Operator.Equals, ParseStatement(rest.Substring(2).Trim()));
             if (rest.StartsWith("!=")) return new BinaryExpression(exp, Operator.NotEquals, ParseStatement(rest.Substring(2).Trim()));
             if (rest.StartsWith("&&")) return new BinaryExpression(exp, Operator.And, ParseStatement(rest.Substring(2).Trim()));
@@ -190,9 +200,12 @@ namespace NLang
             if (statement.First() != '{') throw new Exception("Expected '{' but got " + statement.First());
             statement = statement.Substring(1);
             char first;
-            while ((first = statement.First()) != '}')
+            int depth = 0;
+            while ((first = statement.First()) != '}' || depth != 0)
             {
                 if (statement.Length == 1) throw new Exception("Parentheses not closed");
+                if (first == '{') depth++;
+                else if (first == '}') depth--;
 
                 piece += statement.First();
                 statement = statement.Substring(1);
@@ -227,6 +240,15 @@ namespace NLang
             Expression value = ParseStatement(nam.rest.Substring(1).Trim());
 
             return new AssignmentExpression(name, value);
+        }
+
+        private static PrintExpression ParsePrint(string statement)
+        {
+            statement = statement.Substring(5).Trim();
+
+            Expression toPrint = ParseStatement(statement);
+
+            return new PrintExpression(toPrint);
         }
     }
 }

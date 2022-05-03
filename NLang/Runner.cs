@@ -18,25 +18,25 @@ namespace NLang
 
         public static string Run(string program)
         {
-            /*try
-            {*/
+            try
+            {
                 Expression parsed = Parser.Parse(program);
 
                 Dictionary<string, Primitive> varEnv = new Dictionary<string, Primitive>();
 
                 Primitive result = parsed.Evaluate(varEnv);
 
-                return result switch
+                return "Returned: " + result switch
                 {
                     Integer i => "Int: " + i.Value,
                     Interpreter.Boolean b => "Bool: " + b.Value,
                     Unit => "Unit"
                 };
-            /*}
+            }
             catch (Exception e)
             {
                 return e.Message;
-            }*/
+            }
         }
     }
 }
