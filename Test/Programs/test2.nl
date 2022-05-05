@@ -10,11 +10,11 @@ while (a > 0)
 
 	if (a == 5) 
 	{
-		c = true
+		b = true
 	}
 	else
 	{
-		c = 2 + b
+		c = 2 + a
 	}
 };
 

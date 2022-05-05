@@ -11,7 +11,7 @@ namespace NLang.Interpreter
         public abstract Primitive Evaluate(Dictionary<string, Primitive> varEnv);
     }
 
-    internal enum Operator { Plus, PlusPlus, Minus, MinusMinus, Times, Divide, GreaterThan, LessThan, Equals, NotEquals, Not, And, Or, Modulo }
+    internal enum Operator { Plus, PlusPlus, Minus, MinusMinus, Times, Divide, SquareRoot, GreaterThan, LessThan, Equals, NotEquals, Not, And, Or, Modulo }
 
 
     internal class PrimitiveExpression : Expression
@@ -99,6 +99,7 @@ namespace NLang.Interpreter
                     Operator.Minus => new Integer(-i.Value),
                     Operator.PlusPlus => new Integer(i.Value + 1),
                     Operator.MinusMinus => new Integer(i.Value - 1),
+                    Operator.SquareRoot => new Integer((int)Math.Sqrt(i.Value)),
                     _ => throw new Exception("Operator not valid for 1 integer")
                 },
 
@@ -196,17 +197,19 @@ namespace NLang.Interpreter
 
         public override Primitive Evaluate(Dictionary<string, Primitive> varEnv)
         {
-            Primitive conditionVal = _condition.Evaluate(varEnv);
-
-            if (!(conditionVal is Boolean)) throw new Exception("Condition was not a boolean");
-
-            Boolean b = (Boolean)conditionVal;
-            if (b.Value)
+            while (true)
             {
-                _body.Evaluate(varEnv);
-                return new WhileExpression(_condition, _body).Evaluate(varEnv);
+                Primitive conditionVal = _condition.Evaluate(varEnv);
+
+                if (!(conditionVal is Boolean)) throw new Exception("Condition was not a boolean");
+
+                Boolean b = (Boolean)conditionVal;
+                if (b.Value)
+                {
+                    _body.Evaluate(varEnv);
+                }
+                else return new Void();
             }
-            else return new Void();
         }
     }
 

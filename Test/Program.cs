@@ -1,7 +1,11 @@
 ﻿using NLang;
+using System.Diagnostics;
 
-string path = "./Programs/test2.nl";
+string path = "./Programs/test.nl";
 
-Console.WriteLine(Runner.RunFile(path));
+var result = Runner.RunFile(path);
+Console.WriteLine(result.result);
+Console.WriteLine("Time: " + result.time + "ms");
+
 
 Console.ReadLine();

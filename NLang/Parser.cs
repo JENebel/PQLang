@@ -83,6 +83,12 @@ namespace NLang
                 exp = new UnaryExpression(ParseStatement(next.piece), Operator.Minus);
                 rest = next.rest;
             }
+            else if (statement.StartsWith("£"))
+            {
+                var next = NextPiece(statement.Substring(1));
+                exp = new UnaryExpression(ParseStatement(next.piece), Operator.SquareRoot);
+                rest = next.rest;
+            }
             else if (statement.StartsWith("if"))
             {
                 statement = statement.Substring(2).Trim();
@@ -117,7 +123,6 @@ namespace NLang
                 if (next.rest.StartsWith("-=")) return new AssignmentExpression(next.piece, new BinaryExpression(new VariableLookupExpression(next.piece), Operator.Minus, ParseStatement(next.rest.Substring(2).Trim())));
                 if (next.rest.StartsWith("*=")) return new AssignmentExpression(next.piece, new BinaryExpression(new VariableLookupExpression(next.piece), Operator.Times, ParseStatement(next.rest.Substring(2).Trim())));
                 if (next.rest.StartsWith("/=")) return new AssignmentExpression(next.piece, new BinaryExpression(new VariableLookupExpression(next.piece), Operator.Divide, ParseStatement(next.rest.Substring(2).Trim())));
-
 
 
                 exp = ParseStatement(next.piece);
