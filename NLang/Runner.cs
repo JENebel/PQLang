@@ -4,9 +4,9 @@ using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using NLang.Interpreter;
+using PQLang.Interpreter;
 
-namespace NLang
+namespace PQLang
 {
     public static class Runner
     {
@@ -23,18 +23,23 @@ namespace NLang
             {
                 Expression parsed = Parser.Parse(program);
 
-                Dictionary<string, Primitive> varEnv = new Dictionary<string, Primitive>();
+                Dictionary<string, Primitive> varEnv = new();
+                Dictionary<string, FunctionDefinitionExpression> funEnv = new();
 
                 Stopwatch stopwatch = new Stopwatch();
                 stopwatch.Start();
-                Primitive result = parsed.Evaluate(varEnv);
+                Primitive result = parsed.Evaluate(varEnv, funEnv);
                 stopwatch.Stop();
 
-                return ("Returned: " + result.ToString(), (int)stopwatch.ElapsedMilliseconds);
+                return ("\nReturned: " + result.ToString(), (int)stopwatch.ElapsedMilliseconds);
+            }
+            catch (NLangError e)
+            {
+                return ("Error! " + e.Message, 0);
             }
             catch (Exception e)
             {
-                return ("Error! " + e.Message, 0);
+                return ("Catastrophic failure! " + e.Message, 0);
             }
         }
     }

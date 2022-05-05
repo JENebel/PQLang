@@ -8,17 +8,23 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\NLang\NLang.csproj" />
+    <ProjectReference Include="..\NLang\PQLang.csproj" />
   </ItemGroup>
 
   <ItemGroup>
     <None Update="Programs\test2.nl">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Update="Programs\test.nl">
+    <None Update="Programs\primes.nl">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Update="Programs\test3.nl">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Programs\even.nl">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Programs\test4.nl">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>

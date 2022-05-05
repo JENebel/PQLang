@@ -1,7 +1,7 @@
 ﻿n = 0;
 a = 0;
 
-while (n < 100000) {
+while (n < 1000) {
 	if((n != 0) && (n != 1)) {
 		i = (£n);
 		g = true;
@@ -18,4 +18,4 @@ while (n < 100000) {
 	n++;
 };
 
-a
+print("Primes found: " + a)

@@ -4,9 +4,9 @@ using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
-using NLang.Interpreter;
+using PQLang.Interpreter;
 
-namespace NLang
+namespace PQLang
 {
     internal class Pos { public int line; public int col; }
 
@@ -27,6 +27,7 @@ namespace NLang
 
             List<string> statements = new List<string>();
 
+            int funcs = 0;
             int depth = 0;
             string temp = "";
 
@@ -41,12 +42,21 @@ namespace NLang
 
                 if (f == ';' && depth == 0)
                 {
-                    statements.Add(temp.TrimEnd(';'));
+                    if (temp.StartsWith("fun"))
+                    {
+                        statements.Insert(funcs, temp.TrimEnd(';').Trim());
+                        funcs++;
+                    }
+                    else
+                        statements.Add(temp.TrimEnd(';').Trim());
+
                     temp = "";
                 }
             }
-
-            statements.Add(temp);
+            if (temp.StartsWith("fun"))
+                statements.Insert(funcs, temp.TrimEnd(';').Trim());
+            else
+                statements.Add(temp.TrimEnd(';').Trim());
 
             foreach (string statement in statements)
             {
@@ -60,7 +70,8 @@ namespace NLang
         {
             //Keywords
             if (statement.StartsWith("while")) return ParseWhile(statement);
-            if (statement.StartsWith("print")) return ParsePrint(statement);
+            if (statement.StartsWith("print") && statement.Substring(5).StartsWith('(')) return ParsePrint(statement);
+            if (statement.StartsWith("fun")) return ParseFuncDefinition(statement);
 
             //Literals
             if (statement == "true") return new PrimitiveExpression(new Interpreter.Boolean(true));
@@ -75,6 +86,12 @@ namespace NLang
             {
                 var next = NextPiece(statement.Substring(1));
                 exp = new UnaryExpression(ParseStatement(next.piece), Operator.Not);
+                rest = next.rest;
+            }
+            else if (statement.StartsWith('"'))
+            {
+                var next = NextPiece(statement);
+                exp = new PrimitiveExpression(new Interpreter.String(next.piece));
                 rest = next.rest;
             }
             else if (statement.StartsWith('-'))
@@ -116,6 +133,21 @@ namespace NLang
             else
             {
                 var next = NextPiece(statement.Trim());
+
+                //Function Call
+                if (next.piece.Length > 0 && next.piece.All(char.IsLetter) && next.rest.StartsWith("("))
+                {
+                    string fName = next.piece;
+                    string argString = next.rest.TrimStart('(').TrimEnd(')');
+                    string[] args = argString == "" ? new string[0] : argString.Split(',', StringSplitOptions.TrimEntries);
+                    Expression[] argExps = new Expression[args.Length];
+                    for (int i = 0; i < args.Length; i++)
+                    {
+                        argExps[i] = ParseStatement(args[i]);
+                    }
+                    return new FunctionCallExpression(fName, argExps);
+                }
+
                 if (next.piece.Length > 0 && next.piece.All(char.IsLetter) && next.rest.StartsWith("=") && !next.rest.StartsWith("==")) return new AssignmentExpression(next.piece, ParseStatement(next.rest.Substring(1).Trim()));
                 if (next.rest == "++") return new AssignmentExpression(next.piece, new UnaryExpression(new VariableLookupExpression(next.piece), Operator.PlusPlus));
                 if (next.rest == "--") return new AssignmentExpression(next.piece, new UnaryExpression(new VariableLookupExpression(next.piece), Operator.MinusMinus));
@@ -147,6 +179,20 @@ namespace NLang
             throw new Exception("Could not parse");
         }
 
+        private static Expression ParseFuncDefinition(string statement)
+        {
+            statement = statement.Substring(3).Trim();
+
+            //find arg names
+            var next = NextPiece(statement);
+            string fName = next.piece;
+            next = NextPiece(next.rest);
+            string[] argNames = next.piece == "" ? new string[0] : next.piece.Split(',', StringSplitOptions.TrimEntries);
+            Expression body = ParseBlock(NextBlock(next.rest).piece);
+
+            return new FunctionDefinitionExpression(fName, argNames, body);
+        }
+
         private static (string piece, string rest) NextPiece(string statement)
         {
             string piece = "";
@@ -162,7 +208,22 @@ namespace NLang
                 statement = statement.Substring(1);
             }
 
-            if (statement.First() == '(')
+            if (statement.First() == '"')
+            {
+                statement = statement.Substring(1);
+                char first;
+                while ((first = statement.First()) != '"')
+                {
+                    if (statement.Length == 1) throw new Exception("Runaway string");
+
+                    piece += statement.First();
+                    statement = statement.Substring(1);
+                }
+                statement = statement.Substring(1);
+
+                return (piece, statement.Trim());
+            }
+            else if (statement.First() == '(')
             {
                 statement = statement.Substring(1);
                 char first;

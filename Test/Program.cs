@@ -1,7 +1,7 @@
-﻿using NLang;
+﻿using PQLang;
 using System.Diagnostics;
 
-string path = "./Programs/test.nl";
+string path = "./Programs/primes.nl";
 
 var result = Runner.RunFile(path);
 Console.WriteLine(result.result);
