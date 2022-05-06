@@ -12,19 +12,22 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Update="Programs\test2.nl">
+    <None Update="Programs\test.pq">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Update="Programs\primes.nl">
+    <None Update="Programs\test2.pq">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Update="Programs\test3.nl">
+    <None Update="Programs\primes.pq">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Update="Programs\even.nl">
+    <None Update="Programs\test3.pq">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Update="Programs\test4.nl">
+    <None Update="Programs\even.pq">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Programs\test4.pq">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>

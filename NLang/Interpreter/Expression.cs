@@ -9,6 +9,8 @@ namespace PQLang.Interpreter
     internal abstract class Expression
     {
         public abstract Primitive Evaluate(Dictionary<string, Primitive> varEnv, Dictionary<string, FunctionDefinitionExpression> funEnv);
+
+        public abstract string Unparse();
     }
 
     internal enum Operator { Plus, PlusPlus, Minus, MinusMinus, Times, Divide, SquareRoot, GreaterThan, LessThan, Equals, NotEquals, Not, And, Or, Modulo }
@@ -26,6 +28,11 @@ namespace PQLang.Interpreter
         public override Primitive Evaluate(Dictionary<string, Primitive> varEnv, Dictionary<string, FunctionDefinitionExpression> funEnv)
         {
             return _value;
+        }
+
+        public override string Unparse()
+        {
+            return _value.ToString();
         }
     }
 
@@ -91,6 +98,11 @@ namespace PQLang.Interpreter
                 }
             };
         }
+
+        public override string Unparse()
+        {
+            return "(" + _Left.Unparse() + " " + _op.ToString() + ")";
+        }
     }
 
     internal class UnaryExpression : Expression
@@ -128,6 +140,11 @@ namespace PQLang.Interpreter
                 _ => throw new NLangError("Not valid binary expression, type mismatch")
             };
         }
+
+        public override string Unparse()
+        {
+            return _op.ToString() + " " + _exp.Unparse();
+        }
     }
 
     internal class FunctionDefinitionExpression : Expression
@@ -150,6 +167,11 @@ namespace PQLang.Interpreter
             funEnv.Add(_funName, this);
 
             return new Void();
+        }
+
+        public override string Unparse()
+        {
+            return "fun " + _funName + "(" + string.Join(',', Arguments) + ");";
         }
     }
 
@@ -180,6 +202,11 @@ namespace PQLang.Interpreter
             var result = func.Body.Evaluate(newVarEnv, funEnv);
             return result;
         }
+
+        public override string Unparse()
+        {
+            return _funName + "(" + string.Join(',', _arguments.Select(exp => exp.Unparse())) + ")";
+        }
     }
 
     internal class AssignmentExpression : Expression
@@ -204,6 +231,11 @@ namespace PQLang.Interpreter
 
             return new Void();
         }
+
+        public override string Unparse()
+        {
+            return _varName + "=" + _body.Unparse() + ";";
+        }
     }
 
     internal class VariableLookupExpression : Expression
@@ -220,6 +252,11 @@ namespace PQLang.Interpreter
             if (!varEnv.ContainsKey(_varName)) throw new NLangError("Variable \"" + _varName + "\" does not exist");
 
             return varEnv[_varName];
+        }
+
+        public override string Unparse()
+        {
+            return _varName;
         }
     }
 
@@ -250,6 +287,11 @@ namespace PQLang.Interpreter
                 _ => throw new NLangError("Condition was not a boolean")
             };
         }
+
+        public override string Unparse()
+        {
+            return "if(" + _condition.Unparse() + "){" + _body.Unparse() + "}else{" + _else.Unparse() + "};";
+        }
     }
 
     internal class WhileExpression : Expression
@@ -279,13 +321,18 @@ namespace PQLang.Interpreter
                 else return new Void();
             }
         }
+
+        public override string Unparse()
+        {
+            return "while(" + _condition.Unparse() + "){" + _body.Unparse() + "};";
+        }
     }
 
     internal class BlockExpression : Expression
     {
-        List<Expression> _body;
+        Expression[] _body;
 
-        public BlockExpression(List<Expression> body)
+        public BlockExpression(Expression[] body)
         {
             _body = body;
         }
@@ -294,12 +341,17 @@ namespace PQLang.Interpreter
         {
             Primitive result = new Void();
 
-            for (int i = 0; i < _body.Count; i++)
+            foreach (Expression expression in _body)
             {
-                result = _body[i].Evaluate(varEnv, funEnv);
+                result = expression.Evaluate(varEnv, funEnv);
             }
 
             return result;
+        }
+
+        public override string Unparse()
+        {
+            return "{" + string.Join(";\n", _body.Select(exp => exp.Unparse())) + "}";
         }
     }
 
@@ -317,6 +369,11 @@ namespace PQLang.Interpreter
             Console.WriteLine(_toPrint.Evaluate(varEnv, funEnv).ToString());
 
             return new Void();
+        }
+
+        public override string Unparse()
+        {
+            return _toPrint.Unparse();
         }
     }
 }

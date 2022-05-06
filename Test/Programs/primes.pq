@@ -18,4 +18,6 @@ while (n < 1000) {
 	n++;
 };
 
+if(a > 100) {print("Kæft jeg er Go'")} else {print("Så godt}}\"")};
+
 print("Primes found: " + a)

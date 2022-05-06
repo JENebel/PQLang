@@ -63,7 +63,7 @@ namespace PQLang
                 if(statement != "") result.Add(ParseStatement(statement));
             }
 
-            return new BlockExpression(result);
+            return new BlockExpression(result.ToArray());
         }
 
         private static Expression ParseStatement(string statement)
@@ -126,7 +126,7 @@ namespace PQLang
                 }
                 else
                 {
-                    exp = new IfElseExpression(condition, body, new BlockExpression(new List<Expression> { new PrimitiveExpression(new Interpreter.Void()) }));
+                    exp = new IfElseExpression(condition, body, new BlockExpression(new Expression[] { new PrimitiveExpression(new Interpreter.Void()) }));
                     rest = bod.rest;
                 }
             }

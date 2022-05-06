@@ -21,7 +21,7 @@ namespace PQLang
         {
             try
             {
-                Expression parsed = Parser.Parse(program);
+                Expression parsed = NewParser.Parse(program);
 
                 Dictionary<string, Primitive> varEnv = new();
                 Dictionary<string, FunctionDefinitionExpression> funEnv = new();
@@ -37,10 +37,10 @@ namespace PQLang
             {
                 return ("Error! " + e.Message, 0);
             }
-            catch (Exception e)
+            /*catch (Exception e)
             {
                 return ("Catastrophic failure! " + e.Message, 0);
-            }
+            }*/
         }
     }
 }
