@@ -5,6 +5,8 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using PQLang.Interpreter;
+using Boolean = PQLang.Interpreter.Boolean;
+using String = PQLang.Interpreter.String;
 using Void = PQLang.Interpreter.Void;
 
 namespace PQLang
@@ -12,18 +14,6 @@ namespace PQLang
     internal static class NewParser
     {
         private static string[] blockKeywords = { "while", "fun", "else", "{" }; //Note special case for if
-
-        private static Regex[] precedence = { 
-            new Regex(@"(\\|\\|)"),         //or
-            new Regex(@"(&&)"),             //and
-            new Regex(@"(==|!=)"),          //equality
-            new Regex(@"(<|>)"),            //greater&less
-            new Regex(@"(+|-)"),            //Plus&minus
-            new Regex(@"(*|/|%)"),          //Multipliying
-            new Regex(@"(!(?=[^<>=]))|(((?<=[^a-zA-Z0-9_)])|(?<=\A]))[-](?=[a-zA-Z0-9_]*))|((?<=[a-zA-Z0-9_)])[-]\(.\))"), //-!
-            
-            new Regex(@"([(.)])+")          //Parantethis
-        };
 
         public static Expression Parse(string program)
         {
@@ -52,11 +42,106 @@ namespace PQLang
         {
             if (statement.StartsWith("{")) return ParseBlock(statement);
 
-            string[] or = Regex.Split(statement, @"(\|\|)+").Where(p => p != "").ToArray();
+            string[] arr = SplitOn(statement, "\\|\\|");
+            if(arr.Length > 1) return BuildTree(arr);
 
+            arr = SplitOn(arr.First(), "&&");
+            if (arr.Length > 1) return BuildTree(arr);
 
+            arr = SplitOn(arr.First(), new string[] {"==", "!="});
+            if (arr.Length > 1) return BuildTree(arr);
+
+            arr = SplitOn(arr.First(), new string[] { "<", ">" });
+            if (arr.Length > 1) return BuildTree(arr);
+
+            arr = SplitOn(arr.First(), new string[] { "\\+", "-" }, @"([a-zA-Z0-9_)]$)");
+            if (arr.Length > 1) return BuildTree(arr);
+
+            arr = SplitOn(arr.First(), new string[] { "\\*", "/", "%" });
+            if (arr.Length > 1) return BuildTree(arr);
+
+            arr = SplitOn(arr.First(), new string[] { "!", "-", "\\+" }); //unary minus & plus
+            if (arr.Length > 1) return BuildTree(arr);
+
+            string atom = arr[0];
+
+            if (atom == "true") return new PrimitiveExpression(new Boolean(true));
+            if (atom == "false") return new PrimitiveExpression(new Boolean(false));
+            if (atom.StartsWith("\"") && atom.EndsWith("\"")) return new PrimitiveExpression(new String(atom));
+            if (Regex.IsMatch(atom, @"^[0-9]+$")) return new PrimitiveExpression(new Integer(int.Parse(atom)));
+            if (Regex.IsMatch(atom, @"^[a-zA-Z_][a-zA-Z0-9_]+$")) return new VariableLookupExpression(atom);
+            if (atom.EndsWith(")"))
+            {
+                string fName = "";
+                while (!atom.StartsWith("(")) {
+                    fName += atom.First();
+                    atom = atom.Substring(1);
+                }
+
+                string argString = atom.Substring(1, atom.Length - 1);
+                string[] args = argString == "" ? new string[0] : argString.Split(',', StringSplitOptions.TrimEntries);
+                Expression[] argExps = new Expression[args.Length];
+                for (int i = 0; i < args.Length; i++)
+                {
+                    argExps[i] = ParseStatement(args[i]);
+                }
+                return new FunctionCallExpression(fName, argExps);
+            }
 
             return new PrimitiveExpression(new Void());
+        }
+
+        private static Expression BuildTree(string[] componets)
+        {
+            return new PrimitiveExpression(new Void());
+        }
+
+        private static string[] SplitOn(string input, string separator) { return SplitOn(input, new string[] { separator }); }
+
+        private static string[] SplitOn(string input, string[] separators, string cond = "")
+        {
+            List<string> result = new();
+
+            string temp = "";
+            bool inString = false;
+            bool singleParan = input.StartsWith("(");
+            int depth = 0;
+
+            while (input.Length > 0)
+            {
+                if (input.First() == '"' && !(temp.Length > 0 && temp.Last() == '\\' && inString))
+                    inString = !inString;
+                else if (input.First() == '(')
+                    depth++;
+                else if (input.First() == ')')
+                {
+                    depth--;
+                    if (input.Length != 1)
+                        singleParan = false;
+                }
+
+                if (depth == 0 && !inString) CheckAdd();
+
+                if (input.Length > 0)
+                {
+                    temp += input.First();
+                    input = input.Substring(1);
+                }
+            }
+            result.Add(temp);
+
+            void CheckAdd()
+            {
+                string match = separators.Where(s => Regex.IsMatch(input, "^" + s) && (cond == "" || Regex.IsMatch(temp, cond))).FirstOrDefault("");
+                if (match == "") return;
+
+                result.Add(temp);
+                result.Add(match);
+                input = input.Substring(match.Length);
+                temp = "";
+            }
+
+            if (singleParan) return SplitOn(temp, separators); else return result.Where(r => r != "").ToArray();
         }
 
         private static string[] SplitBlock(string input)

@@ -15,7 +15,6 @@ namespace PQLang.Interpreter
 
     internal enum Operator { Plus, PlusPlus, Minus, MinusMinus, Times, Divide, SquareRoot, GreaterThan, LessThan, Equals, NotEquals, Not, And, Or, Modulo }
 
-
     internal class PrimitiveExpression : Expression
     {
         Primitive _value;
