@@ -25,20 +25,30 @@ namespace PQLang
 
             try
             {
-                Expression parsed = NewParser.Parse(program, progName);
-                Console.WriteLine("Succesfully parsed");
+                Stopwatch stopwatch = new Stopwatch();
+                stopwatch.Start();
+                Expression parsed = Parser.Parse(program, progName);
+                stopwatch.Stop();
+                Console.WriteLine("Succesfully parsed in " + stopwatch.ElapsedMilliseconds + "ms");
+                Console.WriteLine("-------------------------------");
+                Console.WriteLine();
 
+                stopwatch.Reset();
+                stopwatch.Start();
                 Dictionary<string, Primitive> varEnv = new();
                 Dictionary<string, FunctionDefinitionExpression> funEnv = new();
 
-                Stopwatch stopwatch = new Stopwatch();
-                stopwatch.Start();
                 Primitive result = parsed.Evaluate(varEnv, funEnv);
+                if (result is Return) result = ((Return)result).Value.Evaluate(varEnv, funEnv);
                 stopwatch.Stop();
 
                 string str = result.ToString();
                 if (result is Interpreter.String) str = "\"" + str + "\"";
-                return ("\nReturned: " + str, (int)stopwatch.ElapsedMilliseconds);
+                Console.WriteLine();
+                Console.WriteLine("-------------------------------");
+                Console.WriteLine("Returned: " + str);
+                Console.WriteLine("Time: " + stopwatch.ElapsedMilliseconds + "ms");
+                return ("Returned: " + str, (int)stopwatch.ElapsedMilliseconds);
             }
             catch (PQLangParseError e)
             {

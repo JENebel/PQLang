@@ -1,11 +1,9 @@
 ﻿fun Pow(a, b)
 {
-	c = 0;
+	c = a;
 	for (a)
 	{
-		a*=b
+		c*=b
 	}
 	c
 }
-
-Pow(3, 4)

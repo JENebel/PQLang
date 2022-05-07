@@ -11,11 +11,13 @@ namespace PQLang.Interpreter
     {
         public abstract override string ToString();
         public abstract string Type();
+        public abstract void Mutate(Primitive newValue);
+        public abstract Primitive Copy ();
     }
 
     internal class Number : Primitive
     {
-        public float Value { get; }
+        public float Value { get; set; }
         public override string Type() { return "Integer"; }
 
         public Number(int value)
@@ -37,11 +39,22 @@ namespace PQLang.Interpreter
         {
             return Value.ToString();
         }
+
+        public override void Mutate(Primitive newValue)
+        {
+            if (!(newValue.GetType() == GetType())) throw new PQLangError("Type mismatch. Expected " + Type() + " but got " + newValue.Type());
+            Value = ((Number)newValue).Value;
+        }
+
+        public override Primitive Copy()
+        {
+            return new Number(Value);
+        }
     }
 
     internal class Boolean : Primitive
     {
-        public bool Value { get; }
+        public bool Value { get; set; }
         public override string Type() { return "Boolean"; }
 
         public Boolean (bool value)
@@ -53,11 +66,22 @@ namespace PQLang.Interpreter
         {
             return Value.ToString().ToLower();
         }
+
+        public override void Mutate(Primitive newValue)
+        {
+            if (!(newValue.GetType() == GetType())) throw new PQLangError("Type mismatch. Expected " + Type() + " but got " + newValue.Type());
+            Value = ((Boolean)newValue).Value;
+        }
+
+        public override Primitive Copy()
+        {
+            return new Boolean(Value);
+        }
     }
 
     internal class String : Primitive
     {
-        public string Value { get; }
+        public string Value { get; set; }
         public override string Type() { return "String"; }
 
         public String(string value)
@@ -69,11 +93,22 @@ namespace PQLang.Interpreter
         {
             return Value;
         }
+
+        public override void Mutate(Primitive newValue)
+        {
+            if (!(newValue.GetType() == GetType())) throw new PQLangError("Type mismatch. Expected " + Type() + " but got " + newValue.Type());
+            Value = ((String)newValue).Value;
+        }
+
+        public override Primitive Copy()
+        {
+            return new String(Value);
+        }
     }
 
     internal class Array : Primitive
     {
-        public Primitive[] Values { get; }
+        public Primitive[] Values { get; set; }
         public override string Type() { return "Array"; }
 
         public Primitive GetValue(int index) {
@@ -94,9 +129,25 @@ namespace PQLang.Interpreter
             Values = new Primitive[size];
         }
 
+        public Array(Primitive[] array)
+        {
+            Values = array;
+        }
+
         public override string ToString()
         {
             return "(" + string.Join(", ", Values.Select(x => x.ToString())) + ")";
+        }
+
+        public override void Mutate(Primitive newValue)
+        {
+            if (!(newValue.GetType() == GetType())) throw new PQLangError("Type mismatch. Expected " + Type() + " but got " + newValue.Type());
+            Values = ((Array)newValue).Values;
+        }
+
+        public override Primitive Copy()
+        {
+            throw new NotImplementedException();
         }
     }
 
@@ -107,6 +158,62 @@ namespace PQLang.Interpreter
         public override string ToString()
         {
             return "void";
+        }
+
+        public override void Mutate(Primitive newValue)
+        {
+            if (!(newValue.GetType() == GetType())) throw new PQLangError("Type mismatch. Expected " + Type() + " but got " + newValue.Type());
+        }
+
+        public override Primitive Copy()
+        {
+            return new Void();
+        }
+    }
+
+    internal class Break : Primitive
+    {
+        public override string Type() { return "Break"; }
+
+        public override string ToString()
+        {
+            return "break";
+        }
+
+        public override void Mutate(Primitive newValue)
+        {
+            throw new PQLangParseError("Not possible to mutate \"Break\". What are you doing?");
+        }
+
+        public override Primitive Copy()
+        {
+            return new Break();
+        }
+    }
+
+    internal class Return : Primitive
+    {
+        public override string Type() { return "Return"; }
+        public Expression Value { get; }
+
+        public Return(Expression value)
+        {
+            Value = value;
+        }
+
+        public override string ToString()
+        {
+            return "return " + Value.ToString();
+        }
+
+        public override void Mutate(Primitive newValue)
+        {
+            throw new PQLangParseError("Not possible to mutate \"Return\". What are you doing?");
+        }
+
+        public override Primitive Copy()
+        {
+            throw new NotImplementedException();
         }
     }
 }

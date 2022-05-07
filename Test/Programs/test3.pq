@@ -1,12 +1,6 @@
-﻿fun Pow(a, b)
-{
-	c = a;
-	for (a)
-	{
-		c*=b;
-		print(c);
-	}
-	c
-}
+﻿import Math;
 
-Pow(3, 4)
+for(120){
+
+Pow(4, 3)
+}

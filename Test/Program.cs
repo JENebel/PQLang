@@ -1,11 +1,8 @@
 ﻿using PQLang;
 using System.Diagnostics;
 
-string path = "./Programs/test3.pq";
+string path = "./Programs/primes.pq";
 
-var result = Runner.RunFile(path);
-Console.WriteLine(result.result);
-Console.WriteLine("Time: " + result.time + "ms");
-
+Runner.RunFile(path);
 
 Console.ReadLine();
