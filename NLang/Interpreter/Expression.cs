@@ -1,4 +1,5 @@
-﻿using System;
+﻿using PQLang.Errors;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -8,12 +9,37 @@ namespace PQLang.Interpreter
 {
     internal abstract class Expression
     {
-        public abstract Primitive Evaluate(Dictionary<string, Primitive> varEnv, Dictionary<string, FunctionDefinitionExpression> funEnv);
+        public abstract Primitive Evaluate((Dictionary<string, Primitive> outer, Dictionary<string, Primitive> local) varEnv, (Dictionary<string, FunctionDefinitionExpression> outer, Dictionary<string, FunctionDefinitionExpression> local) funEnv);
 
         public abstract string Unparse();
+
+        internal Primitive VarEnvLookup(string varName, (Dictionary<string, Primitive> outer, Dictionary<string, Primitive> local) varEnv)
+        {
+            if (varEnv.outer.ContainsKey(varName)) return varEnv.outer[varName];
+            if (varEnv.local.ContainsKey(varName)) return varEnv.local[varName];
+
+            throw new PQLangError("Variable \"" + varName + "\" does not exist in the current scope");
+        }
+
+        internal FunctionDefinitionExpression FunEnvLookup(string varName, (Dictionary<string, FunctionDefinitionExpression> outer, Dictionary<string, FunctionDefinitionExpression> local) funEnv)
+        {
+            if (funEnv.outer.ContainsKey(varName)) return funEnv.outer[varName];
+            if (funEnv.local.ContainsKey(varName)) return funEnv.local[varName];
+
+            throw new PQLangError("Function \"" + varName + "\" does not exist in the current scope");
+        }
+
+        internal (Dictionary<string, Primitive> outer, Dictionary<string, Primitive> local) CombineVarEnvs((Dictionary<string, Primitive> outer, Dictionary<string, Primitive> local) varEnv)
+        {
+            Dictionary<string, Primitive> newVarEnv = new();
+            foreach (var variable in varEnv.outer)
+            {
+                newVarEnv.Add(variable.Key, variable.Value);
+            }
+        }
     }
 
-    internal enum Operator { Plus, PlusPlus, Minus, MinusMinus, Times, Divide, SquareRoot, GreaterThan, LessThan, Equals, NotEquals, Not, And, Or, Modulo }
+    internal enum Operator { Plus, PlusPlus, Minus, MinusMinus, Times, Divide, SquareRoot, Floor, Ceil, GreaterThan, LessThan, GreaterEqual, LessEqual, Equals, NotEquals, Not, And, Or, Modulo }
 
     internal class PrimitiveExpression : Expression
     {
@@ -24,7 +50,7 @@ namespace PQLang.Interpreter
             _value = value;
         }
 
-        public override Primitive Evaluate(Dictionary<string, Primitive> varEnv, Dictionary<string, FunctionDefinitionExpression> funEnv)
+        public override Primitive Evaluate((Dictionary<string, Primitive> outer, Dictionary<string, Primitive> local) varEnv, (Dictionary<string, FunctionDefinitionExpression> outer, Dictionary<string, FunctionDefinitionExpression> local) funEnv)
         {
             return _value;
         }
@@ -32,6 +58,59 @@ namespace PQLang.Interpreter
         public override string Unparse()
         {
             return _value.ToString();
+        }
+    }
+
+    internal class InitArrayExpression : Expression
+    {
+        private Expression _size;
+
+        public InitArrayExpression(Expression size)
+        {
+            _size = size;
+        }
+
+        public override Primitive Evaluate((Dictionary<string, Primitive> outer, Dictionary<string, Primitive> local) varEnv, (Dictionary<string, FunctionDefinitionExpression> outer, Dictionary<string, FunctionDefinitionExpression> local) funEnv)
+        {
+            var size = _size.Evaluate(varEnv, funEnv);
+            return size switch
+            {
+                Number n => n.Value == (int)n.Value ? new Array((int)n.Value) : throw new PQLangError("Array can only be of integer size"),
+            };
+        }
+
+        public override string Unparse()
+        {
+            return "[" + _size.ToString() + "]";
+        }
+    }
+
+    internal class ArrayLookUpExpression : Expression
+    {
+        private string _varName;
+        private Expression _index;
+
+        public ArrayLookUpExpression(string varName, Expression index)
+        {
+            _varName = varName;
+            _index = index;
+        }
+
+        public override Primitive Evaluate((Dictionary<string, Primitive> outer, Dictionary<string, Primitive> local) varEnv, (Dictionary<string, FunctionDefinitionExpression> outer, Dictionary<string, FunctionDefinitionExpression> local) funEnv)
+        {
+            var array = VarEnvLookup(_varName, varEnv);
+            if (!(array is Array)) throw new PQLangError(_varName + " is " + array.Type() + " and can not be accessed as an array");
+
+            var index = _index.Evaluate(varEnv, funEnv);
+            if (!(index is Number)) throw new PQLangError("Index was " + index.Type() + " and needs to be an integer");
+            if (!(((Number)index).Value == (int)((Number)index).Value)) throw new PQLangError("Index was " + ((Number)index).Value + " and needs to be an integer");
+
+            return ((Array)array).GetValue((int)((Number)index).Value);
+        }
+
+        public override string Unparse()
+        {
+            throw new NotImplementedException();
         }
     }
 
@@ -48,25 +127,27 @@ namespace PQLang.Interpreter
             _op = op;
         }
 
-        public override Primitive Evaluate(Dictionary<string, Primitive> varEnv, Dictionary<string, FunctionDefinitionExpression> funEnv)
+        public override Primitive Evaluate((Dictionary<string, Primitive> outer, Dictionary<string, Primitive> local) varEnv, (Dictionary<string, FunctionDefinitionExpression> outer, Dictionary<string, FunctionDefinitionExpression> local) funEnv)
         {
             Primitive leftVal = _Left.Evaluate(varEnv, funEnv);
             Primitive rightVal = _right.Evaluate(varEnv, funEnv);
 
             return (leftVal, rightVal) switch
             {
-                (Integer l, Integer r) => _op switch
+                (Number l, Number r) => _op switch
                 {
-                    Operator.Plus => new Integer(l.Value + r.Value),
-                    Operator.Minus => new Integer(l.Value - r.Value),
-                    Operator.Times => new Integer(l.Value * r.Value),
-                    Operator.Divide => new Integer(l.Value / r.Value),
+                    Operator.Plus => new Number(l.Value + r.Value),
+                    Operator.Minus => new Number(l.Value - r.Value),
+                    Operator.Times => new Number(l.Value * r.Value),
+                    Operator.Divide => new Number(l.Value / r.Value),
                     Operator.GreaterThan => new Boolean(l.Value > r.Value),
                     Operator.LessThan => new Boolean(l.Value < r.Value),
                     Operator.Equals => new Boolean(l.Value == r.Value),
                     Operator.NotEquals => new Boolean(l.Value != r.Value),
-                    Operator.Modulo => new Integer(l.Value % r.Value),
-                    _ => throw new NLangError("Operator " + _op.ToString() + " not valid for 2 Integers")
+                    Operator.Modulo => new Number(l.Value % r.Value),
+                    Operator.GreaterEqual => new Boolean(l.Value >= r.Value),
+                    Operator.LessEqual => new Boolean(l.Value <= r.Value),
+                    _ => throw new PQLangError("Operator " + _op.ToString() + " not valid for 2 Integers")
                 },
 
                 (Boolean l, Boolean r) => _op switch
@@ -75,32 +156,32 @@ namespace PQLang.Interpreter
                     Operator.NotEquals => new Boolean(l.Value != r.Value),
                     Operator.And => new Boolean(l.Value && r.Value),
                     Operator.Or => new Boolean(l.Value || r.Value),
-                    _ => throw new NLangError("Operator " + _op.ToString() + " not valid for 2 Booleans")
+                    _ => throw new PQLangError("Operator " + _op.ToString() + " not valid for 2 Booleans")
                 },
 
                 //String concat
                 (String l, Primitive r) => _op switch
                 {
                     Operator.Plus => new String(l.Value + r.ToString()),
-                    _ => throw new NLangError("Operator " + _op.ToString() + " not valid for String and " + r.Type())
+                    _ => throw new PQLangError("Operator " + _op.ToString() + " not valid for String and " + r.Type())
                 },
                 (Primitive l, String r) => _op switch
                 {
                     Operator.Plus => new String(l.ToString() + r.Value),
-                    _ => throw new NLangError("Operator " + _op.ToString() + " not valid for " + l.Type() +" and String")
+                    _ => throw new PQLangError("Operator " + _op.ToString() + " not valid for " + l.Type() +" and String")
                 },
 
                 _ => _op switch
                 {
                     Operator.Equals => new Boolean(false),
-                    _ => throw new NLangError("Operator " + _op.ToString() + " not valid for " + leftVal.Type() + " and " + rightVal.Type())
+                    _ => throw new PQLangError("Operator " + _op.ToString() + " not valid for " + leftVal.Type() + " and " + rightVal.Type())
                 }
             };
         }
 
         public override string Unparse()
         {
-            return "(" + _Left.Unparse() + " " + _op.ToString() + ")";
+            return "(" + _Left.Unparse() + " " + _op.ToString() + " " + _right.Unparse() + ")";
         }
     }
 
@@ -115,28 +196,30 @@ namespace PQLang.Interpreter
             _op = op;
         }
 
-        public override Primitive Evaluate(Dictionary<string, Primitive> varEnv, Dictionary<string, FunctionDefinitionExpression> funEnv)
+        public override Primitive Evaluate((Dictionary<string, Primitive> outer, Dictionary<string, Primitive> local) varEnv, (Dictionary<string, FunctionDefinitionExpression> outer, Dictionary<string, FunctionDefinitionExpression> local) funEnv)
         {
             Primitive val = _exp.Evaluate(varEnv, funEnv);
 
             return val switch
             {
-                Integer i => _op switch
+                Number i => _op switch
                 {
-                    Operator.Minus => new Integer(-i.Value),
-                    Operator.PlusPlus => new Integer(i.Value + 1),
-                    Operator.MinusMinus => new Integer(i.Value - 1),
-                    Operator.SquareRoot => new Integer((int)Math.Sqrt(i.Value)),
-                    _ => throw new NLangError("Operator not valid for 1 integer")
+                    Operator.Minus => new Number(-i.Value),
+                    Operator.PlusPlus => new Number(i.Value + 1),
+                    Operator.MinusMinus => new Number(i.Value - 1),
+                    Operator.SquareRoot => new Number((float)Math.Sqrt(i.Value)),
+                    Operator.Floor => new Number((float)Math.Floor(i.Value)),
+                    Operator.Ceil => new Number((float)Math.Ceiling(i.Value)),
+                    _ => throw new PQLangError("Operator not valid for 1 integer")
                 },
 
                 Boolean b => _op switch
                 {
                     Operator.Not => new Boolean(!b.Value),
-                    _ => throw new NLangError("Operator not valid for 1 boolean")
+                    _ => throw new PQLangError("Operator not valid for 1 boolean")
                 },
 
-                _ => throw new NLangError("Not valid binary expression, type mismatch")
+                _ => throw new PQLangError("Not valid binary expression, type mismatch")
             };
         }
 
@@ -159,11 +242,11 @@ namespace PQLang.Interpreter
             Body = body;
         }
 
-        public override Primitive Evaluate(Dictionary<string, Primitive> varEnv, Dictionary<string, FunctionDefinitionExpression> funEnv)
+        public override Primitive Evaluate((Dictionary<string, Primitive> outer, Dictionary<string, Primitive> local) varEnv, (Dictionary<string, FunctionDefinitionExpression> outer, Dictionary<string, FunctionDefinitionExpression> local) funEnv)
         {
-            if (varEnv.ContainsKey(_funName)) throw new NLangError("Function \"" + _funName +"\" already exists");
+            if (varEnv.outer.ContainsKey(_funName) || varEnv.local.ContainsKey(_funName)) throw new PQLangError("Function \"" + _funName +"\" already exists");
 
-            funEnv.Add(_funName, this);
+            funEnv.local.Add(_funName, this);
 
             return new Void();
         }
@@ -185,13 +268,12 @@ namespace PQLang.Interpreter
             _arguments = arguments;
         }
 
-        public override Primitive Evaluate(Dictionary<string, Primitive> varEnv, Dictionary<string, FunctionDefinitionExpression> funEnv)
+        public override Primitive Evaluate((Dictionary<string, Primitive> outer, Dictionary<string, Primitive> local) varEnv, (Dictionary<string, FunctionDefinitionExpression> outer, Dictionary<string, FunctionDefinitionExpression> local) funEnv)
         {
-            if (!funEnv.ContainsKey(_funName)) throw new NLangError("No such function \"" + _funName + "\"");
-            FunctionDefinitionExpression func = funEnv[_funName];
-            if (func.Arguments.Length != _arguments.Length) throw new NLangError("Expected " + func.Arguments.Length + " arguments for function \"" + _funName +  "\" but got " + _arguments.Length);
+            FunctionDefinitionExpression func = FunEnvLookup(_funName, funEnv);
+            if (func.Arguments.Length != _arguments.Length) throw new PQLangError("Expected " + func.Arguments.Length + " arguments for function \"" + _funName +  "\" but got " + _arguments.Length);
 
-            Dictionary<string, Primitive> newVarEnv = new Dictionary<string, Primitive>(varEnv);
+            var newVarEnv = Copy(varEnv);
 
             for (int i = 0; i < _arguments.Count(); i++)
             {
@@ -219,7 +301,7 @@ namespace PQLang.Interpreter
             _body = body;
         }
 
-        public override Primitive Evaluate(Dictionary<string, Primitive> varEnv, Dictionary<string, FunctionDefinitionExpression> funEnv)
+        public override Primitive Evaluate((Dictionary<string, Primitive> outer, Dictionary<string, Primitive> local) varEnv, (Dictionary<string, FunctionDefinitionExpression> outer, Dictionary<string, FunctionDefinitionExpression> local) funEnv)
         {
             Primitive newVal = _body.Evaluate(varEnv, funEnv);
 
@@ -246,9 +328,9 @@ namespace PQLang.Interpreter
             _varName = varName;
         }
 
-        public override Primitive Evaluate(Dictionary<string, Primitive> varEnv, Dictionary<string, FunctionDefinitionExpression> funEnv)
+        public override Primitive Evaluate((Dictionary<string, Primitive> outer, Dictionary<string, Primitive> local) varEnv, (Dictionary<string, FunctionDefinitionExpression> outer, Dictionary<string, FunctionDefinitionExpression> local) funEnv)
         {
-            if (!varEnv.ContainsKey(_varName)) throw new NLangError("Variable \"" + _varName + "\" does not exist");
+            if (!varEnv.ContainsKey(_varName)) throw new PQLangError("Variable \"" + _varName + "\" does not exist");
 
             return varEnv[_varName];
         }
@@ -272,7 +354,7 @@ namespace PQLang.Interpreter
             _else = els;
         }
 
-        public override Primitive Evaluate(Dictionary<string, Primitive> varEnv, Dictionary<string, FunctionDefinitionExpression> funEnv)
+        public override Primitive Evaluate((Dictionary<string, Primitive> outer, Dictionary<string, Primitive> local) varEnv, (Dictionary<string, FunctionDefinitionExpression> outer, Dictionary<string, FunctionDefinitionExpression> local) funEnv)
         {
             Primitive conditionVal = _condition.Evaluate(varEnv, funEnv);
 
@@ -283,7 +365,7 @@ namespace PQLang.Interpreter
                     true => _body.Evaluate(varEnv, funEnv),
                     false => _else.Evaluate(varEnv, funEnv)
                 },
-                _ => throw new NLangError("Condition was not a boolean")
+                _ => throw new PQLangError("Condition was not a boolean")
             };
         }
 
@@ -296,7 +378,7 @@ namespace PQLang.Interpreter
     internal class WhileExpression : Expression
     {
         Expression _condition;
-        BlockExpression _body;
+        Expression _body;
 
         public WhileExpression(Expression condition, BlockExpression body)
         {
@@ -304,18 +386,20 @@ namespace PQLang.Interpreter
             _body = body;
         }
 
-        public override Primitive Evaluate(Dictionary<string, Primitive> varEnv, Dictionary<string, FunctionDefinitionExpression> funEnv)
+        public override Primitive Evaluate((Dictionary<string, Primitive> outer, Dictionary<string, Primitive> local) varEnv, (Dictionary<string, FunctionDefinitionExpression> outer, Dictionary<string, FunctionDefinitionExpression> local) funEnv)
         {
+            var cVarEnv = Copy(varEnv);
             while (true)
             {
+                cVarEnv = Copy(cVarEnv);
                 Primitive conditionVal = _condition.Evaluate(varEnv, funEnv);
 
-                if (!(conditionVal is Boolean)) throw new NLangError("Condition was not a boolean");
+                if (!(conditionVal is Boolean)) throw new PQLangError("Condition was not a boolean");
 
                 Boolean b = (Boolean)conditionVal;
                 if (b.Value)
                 {
-                    _body.Evaluate(varEnv, funEnv);
+                    _body.Evaluate(cVarEnv, funEnv);
                 }
                 else return new Void();
             }
@@ -336,13 +420,21 @@ namespace PQLang.Interpreter
             _body = body;
         }
 
-        public override Primitive Evaluate(Dictionary<string, Primitive> varEnv, Dictionary<string, FunctionDefinitionExpression> funEnv)
+        public List<FunctionDefinitionExpression> Functions { get { 
+                return _body.Where(e => e is FunctionDefinitionExpression).Select(e => (FunctionDefinitionExpression)e).ToList();
+            } 
+        }
+
+        public override Primitive Evaluate((Dictionary<string, Primitive> outer, Dictionary<string, Primitive> local) varEnv, (Dictionary<string, FunctionDefinitionExpression> outer, Dictionary<string, FunctionDefinitionExpression> local) funEnv)
         {
             Primitive result = new Void();
 
+            var newVarEnv = Copy(varEnv);
+            var newFunEnv = Copy(funEnv);
+
             foreach (Expression expression in _body)
             {
-                result = expression.Evaluate(varEnv, funEnv);
+                result = expression.Evaluate(newVarEnv, newFunEnv);
             }
 
             return result;
@@ -363,9 +455,9 @@ namespace PQLang.Interpreter
             _toPrint = toPrint;
         }
 
-        public override Primitive Evaluate(Dictionary<string, Primitive> varEnv, Dictionary<string, FunctionDefinitionExpression> funEnv)
+        public override Primitive Evaluate((Dictionary<string, Primitive> outer, Dictionary<string, Primitive> local) varEnv, (Dictionary<string, FunctionDefinitionExpression> outer, Dictionary<string, FunctionDefinitionExpression> local) funEnv)
         {
-            Console.WriteLine(_toPrint.Evaluate(varEnv, funEnv).ToString());
+            Console.WriteLine("PQ: " + _toPrint.Evaluate(varEnv, funEnv).ToString());
 
             return new Void();
         }
@@ -373,6 +465,51 @@ namespace PQLang.Interpreter
         public override string Unparse()
         {
             return _toPrint.Unparse();
+        }
+    }
+
+    internal class ForLoopExpression : Expression
+    {
+        AssignmentExpression _assign;
+        Expression _condition;
+        AssignmentExpression _increment;
+        BlockExpression _body;
+
+        public ForLoopExpression(AssignmentExpression assign, Expression condition, AssignmentExpression increment, BlockExpression body)
+        {
+            _assign = assign;
+            _condition = condition;
+            _increment = increment;
+            _body = body;
+        }
+
+        public override Primitive Evaluate((Dictionary<string, Primitive> outer, Dictionary<string, Primitive> local) varEnv, (Dictionary<string, FunctionDefinitionExpression> outer, Dictionary<string, FunctionDefinitionExpression> local) funEnv)
+        {
+            var newVarEnv = Copy(varEnv);
+            _assign.Evaluate(newVarEnv, funEnv);
+            var cVarEnv = Copy(newVarEnv);
+            while (true)
+            {
+                cVarEnv = Copy(cVarEnv);
+
+                Primitive conditionVal = _condition.Evaluate(cVarEnv, funEnv);
+
+                if (!(conditionVal is Boolean)) throw new PQLangError("Condition was not a boolean");
+
+                Boolean b = (Boolean)conditionVal;
+                if (b.Value)
+                {
+                    _body.Evaluate(cVarEnv, funEnv);
+
+                    _increment.Evaluate(cVarEnv, funEnv);
+                }
+                else return new Void();
+            }
+        }
+
+        public override string Unparse()
+        {
+            return "for(" + _assign.Unparse() + ";" + _condition.Unparse() + ";" + _increment.Unparse() + "){" + _body.Unparse() + "}";
         }
     }
 }

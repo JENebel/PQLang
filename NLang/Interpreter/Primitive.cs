@@ -1,4 +1,5 @@
-﻿using System;
+﻿using PQLang.Errors;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -12,16 +13,26 @@ namespace PQLang.Interpreter
         public abstract string Type();
     }
 
-    internal class Integer : Primitive
+    internal class Number : Primitive
     {
-        public int Value { get; }
+        public float Value { get; }
         public override string Type() { return "Integer"; }
 
-        public Integer(int value)
+        public Number(int value)
         {
             Value = value;
         }
 
+        public Number(float value)
+        {
+            Value = value;
+        }
+
+        public bool IsInteger()
+        {
+            return Value == (int)Value;
+        }
+        
         public override string ToString()
         {
             return Value.ToString();
@@ -57,6 +68,35 @@ namespace PQLang.Interpreter
         public override string ToString()
         {
             return Value;
+        }
+    }
+
+    internal class Array : Primitive
+    {
+        public Primitive[] Values { get; }
+        public override string Type() { return "Array"; }
+
+        public Primitive GetValue(int index) {
+            if (index > 0 && index < Values.Length)
+                return Values[index] == null ? new Void() : Values[index];
+            else throw new PQLangError("Index " + index + " was out of bounds");
+        }
+
+        public void SetValue(int index, Primitive value) 
+        {
+            if (index > 0 && index < Values.Length)
+                Values[index] = value;
+            else throw new PQLangError("Index " + index + " was out of bounds");
+        }
+
+        public Array(int size)
+        {
+            Values = new Primitive[size];
+        }
+
+        public override string ToString()
+        {
+            return "(" + string.Join(", ", Values.Select(x => x.ToString())) + ")";
         }
     }
 

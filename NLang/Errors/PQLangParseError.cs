@@ -4,13 +4,13 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace PQLang
+namespace PQLang.Errors
 {
-    public class NLangError : Exception
+    public class PQLangParseError : Exception
     {
         public override string Message { get; }
 
-        public NLangError(string message)
+        public PQLangParseError(string message)
         {
             Message = message;
         }

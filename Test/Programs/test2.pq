@@ -18,4 +18,4 @@ while (a > 0)
 	}
 };
 
-print(c);
+print c;

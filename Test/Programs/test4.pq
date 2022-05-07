@@ -1,3 +1,6 @@
-﻿a = 12;
+﻿import lib;
 
-print("a= " + a)
+
+a = Pow(2, 3);
+
+a

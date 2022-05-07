@@ -1,10 +1,9 @@
 ﻿fun Pow(a, b)
 {
-	c = a;
+	c = 0;
 	for (a)
 	{
-		c*=b;
-		print(c);
+		a*=b
 	}
 	c
 }

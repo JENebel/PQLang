@@ -70,13 +70,13 @@ namespace PQLang
         {
             //Keywords
             if (statement.StartsWith("while")) return ParseWhile(statement);
-            if (statement.StartsWith("print") && statement.Substring(5).StartsWith('(')) return ParsePrint(statement);
+            if (statement.StartsWith("print")) return new PrintExpression(ParseStatement(statement.Substring(5)));
             if (statement.StartsWith("fun")) return ParseFuncDefinition(statement);
 
             //Literals
             if (statement == "true") return new PrimitiveExpression(new Interpreter.Boolean(true));
             if (statement == "false") return new PrimitiveExpression(new Interpreter.Boolean(false));
-            if (statement.Length > 0 && statement.All(char.IsDigit)) return new PrimitiveExpression(new Integer(int.Parse(statement)));
+            if (statement.Length > 0 && statement.All(char.IsDigit)) return new PrimitiveExpression(new Number(int.Parse(statement)));
             if (statement.Length > 0 && statement.All(char.IsLetter)) return new VariableLookupExpression(statement);
 
             //Expressions

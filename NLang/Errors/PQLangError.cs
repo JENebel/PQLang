@@ -6,11 +6,11 @@ using System.Threading.Tasks;
 
 namespace PQLang.Errors
 {
-    public class NLangParseError : Exception
+    public class PQLangError : Exception
     {
         public override string Message { get; }
 
-        public NLangParseError(string message)
+        public PQLangError(string message)
         {
             Message = message;
         }
