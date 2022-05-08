@@ -1,9 +1,9 @@
 ﻿fun Pow(a, b)
 {
 	c = a;
-	for (a)
+	for (b - 1)
 	{
-		c*=b
+		c*=a
 	}
 	c
 }

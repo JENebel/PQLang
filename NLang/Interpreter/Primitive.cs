@@ -12,13 +12,13 @@ namespace PQLang.Interpreter
         public abstract override string ToString();
         public abstract string Type();
         public abstract void Mutate(Primitive newValue);
-        public abstract Primitive Copy ();
+        public abstract Primitive Copy();
     }
 
     internal class Number : Primitive
     {
         public float Value { get; set; }
-        public override string Type() { return "Integer"; }
+        public override string Type() { return "Number"; }
 
         public Number(int value)
         {
@@ -42,7 +42,6 @@ namespace PQLang.Interpreter
 
         public override void Mutate(Primitive newValue)
         {
-            if (!(newValue.GetType() == GetType())) throw new PQLangError("Type mismatch. Expected " + Type() + " but got " + newValue.Type());
             Value = ((Number)newValue).Value;
         }
 
@@ -69,7 +68,6 @@ namespace PQLang.Interpreter
 
         public override void Mutate(Primitive newValue)
         {
-            if (!(newValue.GetType() == GetType())) throw new PQLangError("Type mismatch. Expected " + Type() + " but got " + newValue.Type());
             Value = ((Boolean)newValue).Value;
         }
 
@@ -96,7 +94,6 @@ namespace PQLang.Interpreter
 
         public override void Mutate(Primitive newValue)
         {
-            if (!(newValue.GetType() == GetType())) throw new PQLangError("Type mismatch. Expected " + Type() + " but got " + newValue.Type());
             Value = ((String)newValue).Value;
         }
 
@@ -111,19 +108,6 @@ namespace PQLang.Interpreter
         public Primitive[] Values { get; set; }
         public override string Type() { return "Array"; }
 
-        public Primitive GetValue(int index) {
-            if (index > 0 && index < Values.Length)
-                return Values[index] == null ? new Void() : Values[index];
-            else throw new PQLangError("Index " + index + " was out of bounds");
-        }
-
-        public void SetValue(int index, Primitive value) 
-        {
-            if (index > 0 && index < Values.Length)
-                Values[index] = value;
-            else throw new PQLangError("Index " + index + " was out of bounds");
-        }
-
         public Array(int size)
         {
             Values = new Primitive[size];
@@ -136,18 +120,22 @@ namespace PQLang.Interpreter
 
         public override string ToString()
         {
-            return "(" + string.Join(", ", Values.Select(x => x.ToString())) + ")";
+            return "[" + string.Join(", ", Values.Select(x => x != null ? x.ToString() : "?")) + "]";
         }
 
         public override void Mutate(Primitive newValue)
         {
-            if (!(newValue.GetType() == GetType())) throw new PQLangError("Type mismatch. Expected " + Type() + " but got " + newValue.Type());
             Values = ((Array)newValue).Values;
+        }
+
+        public void Mutate(Primitive newValue, int index)
+        {
+            Values[index] = newValue.Copy();
         }
 
         public override Primitive Copy()
         {
-            throw new NotImplementedException();
+            return new Array(Values.Length) { Values = Values.Select(x => x != null ? x.Copy() : new Void()).ToArray() };
         }
     }
 
@@ -162,7 +150,7 @@ namespace PQLang.Interpreter
 
         public override void Mutate(Primitive newValue)
         {
-            if (!(newValue.GetType() == GetType())) throw new PQLangError("Type mismatch. Expected " + Type() + " but got " + newValue.Type());
+            throw new PQLangError("Not possible to mutate \"Void\". What are you doing?");
         }
 
         public override Primitive Copy()
@@ -214,6 +202,45 @@ namespace PQLang.Interpreter
         public override Primitive Copy()
         {
             throw new NotImplementedException();
+        }
+    }
+
+    internal class Object : Primitive
+    {
+        public Dictionary<string, Primitive> VarEnv { get; set; }
+        public Dictionary<string, FunctionDefinitionExpression> FunEnv { get; set; }
+        public Dictionary<string, ClassDefinitionExpression> ClassEnv { get; set; }
+        public string ClassName { get; set; }
+
+        public Object(string className, Dictionary<string, Primitive> varEnv, Dictionary<string, FunctionDefinitionExpression> funEnv, Dictionary<string, ClassDefinitionExpression> classEnv)
+        {
+            VarEnv = varEnv;
+            FunEnv = funEnv;
+            ClassEnv = classEnv;
+            ClassName = className;
+        }
+
+        public override Primitive Copy()
+        {
+            return new Object(ClassName, Expression.Copy(VarEnv), FunEnv, ClassEnv);
+        }
+
+        public override void Mutate(Primitive newValue)
+        {
+            VarEnv = Expression.Copy(((Object)newValue).VarEnv);
+            FunEnv = Expression.Copy(((Object)newValue).FunEnv);
+            ClassEnv = Expression.Copy(((Object)newValue).ClassEnv);
+            ClassName = ((Object)newValue).ClassName;
+        }
+
+        public override string ToString()
+        {
+            return Type();
+        }
+
+        public override string Type()
+        {
+            return "<" + ClassName + ">";
         }
     }
 }

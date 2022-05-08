@@ -10,24 +10,19 @@ using PQLang.Interpreter;
 
 namespace PQLang
 {
-    public static class Runner
+    public static class Program
     {
-        public static (string result, int time) RunFile(string fileName)
+        public static void Main(string[] args)
         {
-            string program = File.ReadAllText(fileName);
+            string program = Path.GetFileNameWithoutExtension(args[0]);
 
-            return Run(program, Path.GetFileNameWithoutExtension(fileName));
-        }
-
-        public static (string result, int time) Run(string program, string progName = "")
-        {
             CultureInfo.CurrentCulture = CultureInfo.InvariantCulture;
 
             try
             {
                 Stopwatch stopwatch = new Stopwatch();
                 stopwatch.Start();
-                Expression parsed = Parser.Parse(program, progName);
+                Expression parsed = Parser.Parse(program);
                 stopwatch.Stop();
                 Console.WriteLine("Succesfully parsed in " + stopwatch.ElapsedMilliseconds + "ms");
                 Console.WriteLine("-------------------------------");
@@ -37,9 +32,10 @@ namespace PQLang
                 stopwatch.Start();
                 Dictionary<string, Primitive> varEnv = new();
                 Dictionary<string, FunctionDefinitionExpression> funEnv = new();
+                Dictionary<string, ClassDefinitionExpression> classEnv = new();
 
-                Primitive result = parsed.Evaluate(varEnv, funEnv);
-                if (result is Return) result = ((Return)result).Value.Evaluate(varEnv, funEnv);
+                Primitive result = parsed.Evaluate(varEnv, funEnv, classEnv);
+                if (result is Return) result = ((Return)result).Value.Evaluate(varEnv, funEnv, classEnv);
                 stopwatch.Stop();
 
                 string str = result.ToString();
@@ -48,20 +44,27 @@ namespace PQLang
                 Console.WriteLine("-------------------------------");
                 Console.WriteLine("Returned: " + str);
                 Console.WriteLine("Time: " + stopwatch.ElapsedMilliseconds + "ms");
-                return ("Returned: " + str, (int)stopwatch.ElapsedMilliseconds);
             }
             catch (PQLangParseError e)
             {
-                return ("Parse Error! " + e.Message, 0);
+                Console.WriteLine("-------------------------------");
+                string err = "Parse Error! " + e.Message;
+                Console.WriteLine(err);
             }
             catch (PQLangError e)
             {
-                return ("Error! " + e.Message, 0);
+                Console.WriteLine("-------------------------------");
+                string err = "Error! " + e.Message;
+                Console.WriteLine(err);
             }
-            /*catch (Exception e)
+            catch (PQError e)
             {
-                return ("Catastrophic failure! " + e.Message, 0);
-            }*/
+                Console.WriteLine("-------------------------------");
+                string err = "Program error: " + e.Message;
+                Console.WriteLine(err);
+            }
+            
+            Console.ReadLine();
         }
     }
 }

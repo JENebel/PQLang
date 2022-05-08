@@ -1,8 +1,6 @@
 ﻿using PQLang;
 using System.Diagnostics;
 
-string path = "./Programs/primes.pq";
-
-Runner.RunFile(path);
+PQLang.Program.Main(new string[] { "test3" });
 
 Console.ReadLine();

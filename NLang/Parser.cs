@@ -14,35 +14,45 @@ namespace PQLang
 {
     internal static class Parser
     {
-        private static readonly string[] keywords = { "while", "fun", "if", "else", "print", "sqrt", "for", "floor", "ceil", "break", "return" };
-        private static readonly string[] blockKeywords = { "while", "for", "fun", "else", "{" }; //Note special case for if
+        private static readonly string[] keywords = { "while", "fun", "if", "else", "print", "sqrt", "for", "floor", "ceil", "break", "return", "class", "new", "type", "error" };
+        private static readonly string[] blockKeywords = { "while", "for", "fun", "else", "{", "class" }; //Note special case for if
 
-        public static BlockExpression Parse(string program, string progName, List<string> includedLibs = null)
+        public static BlockExpression Parse(string programName, List<string> includedLibs = null)
         {
+            if (!File.Exists("./" + programName + ".pq")) throw new PQLangParseError(programName + ".pq could not be found");
+            string[] progLines = File.ReadLines("./" + programName + ".pq").ToArray();
+            progLines = progLines.Select(line => line.Split("//")[0]).ToArray();
+
+            string program = string.Join("", progLines);
+
             if (includedLibs == null) includedLibs = new List<string>();
 
             var preparedProgram = PrepareProgram(program);
 
             //load libs
+            List<ClassDefinitionExpression> libraryClasses = new();
             List<FunctionDefinitionExpression> libraryFunctions = new();
 
             foreach (string lib in preparedProgram.libs)
             {
-                if (lib != progName && !includedLibs.Contains(lib))
-                if (!File.Exists("./" + lib + ".pq")) throw new PQLangParseError(lib + ".pq could not be found");
-                string libProg = File.ReadAllText("./" + lib + ".pq");
-                var libs = PrepareProgram(libProg);
-                includedLibs.AddRange(libs.libs);
+                if (lib != program && !includedLibs.Contains(lib))
+                {
+                    var libs = PrepareProgram(lib).libs;
+                    includedLibs.AddRange(libs);
 
-                BlockExpression libExp = Parse(libProg, progName, includedLibs);
-                libraryFunctions.AddRange(libExp.Functions);
+                    BlockExpression libExp = Parse(lib, includedLibs);
+                    libraryFunctions.AddRange(libExp.Functions);
+                    libraryClasses.AddRange(libExp.Classes);
+                }
             }
 
-            if(libraryFunctions.Count != 0)
+            if(libraryFunctions.Count != 0 || libraryClasses.Count != 0)
             {
-                List<Expression> expressions = new List<Expression>(libraryFunctions);
+                List<Expression> expressions = new List<Expression>();
+                expressions.AddRange(libraryClasses);
+                expressions.AddRange(libraryFunctions);
                 expressions.Add(ParseBlock("{" + preparedProgram.program + "}"));
-                return new BlockExpression(expressions.ToArray());
+                return new BlockExpression(expressions);
             }
             else
                 return ParseBlock("{" + preparedProgram.program + "}");
@@ -58,7 +68,7 @@ namespace PQLang
                 if (input[i] == '"' && i > 0 && !(input[i - 1] == '\\' && inString))
                     inString = !inString;
 
-                if (!Char.IsWhiteSpace(input[i]) || inString || ((output.EndsWith("fun") || output.EndsWith("return")) && input[i] == ' '))
+                if (!Char.IsWhiteSpace(input[i]) || inString || ((output.EndsWith("fun") || output.EndsWith("return") || output.EndsWith("class") || output.EndsWith("new")) && input[i] == ' '))
                 {
                     output += input[i];
                 }
@@ -86,7 +96,7 @@ namespace PQLang
                 expressions[i] = ParseStatement(statements[i]);
             }
 
-            return new BlockExpression(expressions);
+            return new BlockExpression(expressions.ToList());
         }
 
         private static bool CheckValidName(string name)
@@ -131,15 +141,19 @@ namespace PQLang
                 var body = NextParan(cond.rest, '{');
                 if (body.rest.StartsWith("else"))
                 {
-                    return new IfElseExpression(ParseStatement(cond.paran.Substring(1, cond.paran.Length-2)), ParseBlock(body.paran), ParseBlock(body.rest.Substring(4)));
+                    return new IfElseExpression(ParseStatement(cond.paran.Substring(1, cond.paran.Length - 2)), ParseBlock(body.paran), ParseBlock(body.rest.Substring(4)));
                 }
                 else
-                    return new IfElseExpression(ParseStatement(cond.paran.Substring(1, cond.paran.Length - 2)), ParseBlock(body.paran),new BlockExpression(new Expression[] { new PrimitiveExpression(new Void()) }));
+                    return new IfElseExpression(ParseStatement(cond.paran.Substring(1, cond.paran.Length - 2)), ParseBlock(body.paran),new BlockExpression(new List<Expression> { new PrimitiveExpression(new Void()) }));
             } //if
             if (statement.StartsWith("print("))
             {
                 return new PrintExpression(ParseStatement(statement.Substring(6, statement.Length - 7)));
             } //print
+            if (statement.StartsWith("error("))
+            {
+                return new ErrorExpression(ParseStatement(statement.Substring(6, statement.Length - 7)));
+            } //error
             if (statement.StartsWith("fun "))
             {
                 string trimmed = statement.Substring(4);
@@ -165,7 +179,49 @@ namespace PQLang
                 Expression body = ParseBlock(args.rest);
 
                 return new FunctionDefinitionExpression(name, argNames, body);
+            } //ClassDef
+            if (statement.StartsWith("class "))
+            {
+                string trimmed = statement.Substring(6);
+
+                //find arg names
+                int split = trimmed.IndexOf('(');
+                string name = trimmed.Substring(0, split);
+                var args = NextParan(trimmed.Substring(split, trimmed.Length - split));
+
+                string[] argNames = args.paran.Substring(1, args.paran.Length - 2).Split(',');
+                if (argNames.Length == 1 && argNames[0] == "") argNames = new string[0];
+
+                foreach (var arg in argNames)
+                {
+                    if (!CheckValidName(arg))
+                    {
+                        throw new PQLangParseError("Invalid parameter name \"" + arg + "\" in class " + name + args.paran);
+                    }
+                }
+
+                if (argNames.GroupBy(x => x).Any(g => g.Count() > 1)) throw new PQLangParseError("Duplicate parameter names in: class " + name + args.paran);
+
+                Expression body = ParseBlock(args.rest);
+                if (body is not BlockExpression) body = new BlockExpression(new List<Expression>() { body });
+
+                return new ClassDefinitionExpression(name, argNames, (BlockExpression)body);
             } //FunDef
+            if (statement.StartsWith("new "))
+            {
+                //find arg names
+                int split = statement.IndexOf('(');
+                string name = statement.Substring(4, split - 4);
+                if (CheckValidName(name))
+                {
+                    string rest = statement.Substring(split + 1, statement.Length - split - 2);
+
+                    Expression[] args = SplitOn(rest, ",").Where(a => a != ",").Select(a => ParseStatement(a)).ToArray();
+
+                    return new ClassInstantiateExpression(name, args);
+                }
+                else throw new PQLangParseError("Invalid class name \"" + name +"\"");
+            } //New object
             if (statement.StartsWith("return "))
             {
                 string rest = statement.Substring(7);
@@ -181,14 +237,11 @@ namespace PQLang
                 //find arg names
                 int split = statement.IndexOf('(');
                 string name = statement.Substring(0, split);
-                if (CheckValidName(name))
-                {
-                    string rest = statement.Substring(split + 1, statement.Length - split - 2);
+                string rest = statement.Substring(split + 1, statement.Length - split - 2);
 
-                    Expression[] args = SplitOn(rest, ",").Where(a => a != ",").Select(a => ParseStatement(a)).ToArray();
+                Expression[] args = SplitOn(rest, ",").Where(a => a != ",").Select(a => ParseStatement(a)).ToArray();
 
-                    return new FunctionCallExpression(name, args);
-                }
+                return new FunctionCallExpression(name, args);
             } //FunCall
             if (Regex.IsMatch(statement, @"^[a-zA-Z_][a-zA-Z0-9_]*=[^=]"))
             {
@@ -197,7 +250,9 @@ namespace PQLang
                 string rest = statement.Substring(split + 1, statement.Length - split - 1);
                 return new AssignmentExpression(name, ParseStatement(rest));
             } //Assign
-            if (Regex.IsMatch(statement, @"^[a-zA-Z_][a-zA-Z0-9_]*\+\+"))
+            
+            #region Operator+Assign
+            if (Regex.IsMatch(statement, @"^[a-zA-Z_][a-zA-Z0-9_]*\+\+$"))
             {
                 string name = statement.Substring(0, statement.Length - 2);
                 return new AssignmentExpression(name, new UnaryExpression(new VariableLookupExpression(name), Operator.PlusPlus));
@@ -209,29 +264,91 @@ namespace PQLang
             } //--
             if (Regex.IsMatch(statement, @"^[a-zA-Z_][a-zA-Z0-9_]*\+="))
             {
-                string[] split = statement.Split("+=");
-                if (split.Length != 2) throw new PQLangParseError("Bad syntax at: " + statement);
-                return new AssignmentExpression(split[0], new BinaryExpression(new VariableLookupExpression(split[0]), Operator.Plus, ParseStatement(split[1])));
+                int split = statement.IndexOf("+=");
+                string name = statement.Substring(0, split);
+                string rest = statement.Substring(split + 2, statement.Length-split-2);
+                return new AssignmentExpression(name, new BinaryExpression(new VariableLookupExpression(name), Operator.Plus, ParseStatement(rest)));
             } //+=
             if (Regex.IsMatch(statement, @"^[a-zA-Z_][a-zA-Z0-9_]*-="))
             {
-                string[] split = statement.Split("-=");
-                if (split.Length != 2) throw new PQLangParseError("Bad syntax at: " + statement);
-                return new AssignmentExpression(split[0], new BinaryExpression(new VariableLookupExpression(split[0]), Operator.Minus, ParseStatement(split[1])));
+                int split = statement.IndexOf("-=");
+                string name = statement.Substring(0, split);
+                string rest = statement.Substring(split + 2, statement.Length - split - 2);
+                return new AssignmentExpression(name, new BinaryExpression(new VariableLookupExpression(name), Operator.Minus, ParseStatement(rest)));
             } //-=
             if (Regex.IsMatch(statement, @"^[a-zA-Z_][a-zA-Z0-9_]*\*="))
             {
-                string[] split = statement.Split("*=");
-                if (split.Length != 2) throw new PQLangParseError("Bad syntax at: " + statement);
-                return new AssignmentExpression(split[0], new BinaryExpression(new VariableLookupExpression(split[0]), Operator.Times, ParseStatement(split[1])));
+                int split = statement.IndexOf("*=");
+                string name = statement.Substring(0, split);
+                string rest = statement.Substring(split + 2, statement.Length - split - 2);
+                return new AssignmentExpression(name, new BinaryExpression(new VariableLookupExpression(name), Operator.Times, ParseStatement(rest)));
             } //-=
             if (Regex.IsMatch(statement, @"^[a-zA-Z_][a-zA-Z0-9_]*/="))
             {
-                string[] split = statement.Split("/=");
-                if (split.Length != 2) throw new PQLangParseError("Bad syntax at: " + statement);
-                return new AssignmentExpression(split[0], new BinaryExpression(new VariableLookupExpression(split[0]), Operator.Divide, ParseStatement(split[1])));
+                int split = statement.IndexOf("/=");
+                string name = statement.Substring(0, split);
+                string rest = statement.Substring(split + 2, statement.Length - split - 2);
+                return new AssignmentExpression(name, new BinaryExpression(new VariableLookupExpression(name), Operator.Divide, ParseStatement(rest)));
             } //-=
+            if (Regex.IsMatch(statement, @"^[a-zA-Z_][a-zA-Z0-9_]*\[.\]\+\+$"))
+            {
+                int split = statement.IndexOf('[');
+                string name = statement.Substring(0, split);
+                var index = NextParan(statement.Substring(split, statement.Length - split), '[');
+                Expression indExp = ParseStatement(index.paran.Substring(1, index.paran.Length - 2));
+                return new ArraySetExpression(name, indExp, new UnaryExpression(new ArrayLookUpExpression(name, indExp), Operator.PlusPlus));
+            } //a[]++
+            if (Regex.IsMatch(statement, @"^[a-zA-Z_][a-zA-Z0-9_]*\[.\]--$"))
+            {
+                int split = statement.IndexOf('[');
+                string name = statement.Substring(0, split);
+                var index = NextParan(statement.Substring(split, statement.Length - split), '[');
+                Expression indExp = ParseStatement(index.paran.Substring(1, index.paran.Length - 2));
+                return new ArraySetExpression(name, indExp, new UnaryExpression(new ArrayLookUpExpression(name, indExp), Operator.MinusMinus));
+            } //a[]--
+            if (Regex.IsMatch(statement, @"^[a-zA-Z_][a-zA-Z0-9_]*\[.\]\+="))
+            {
+                int split = statement.IndexOf("+=");
+                string square = statement.Substring(0, split);
+                string rest = statement.Substring(split + 2, statement.Length - split - 2);
+                split = square.IndexOf('[');
+                string name = square.Substring(0, split);
+                Expression index = ParseStatement(square.Substring(split + 1, square.Length - split - 2));
+                return new ArraySetExpression(name, index, new BinaryExpression(new ArrayLookUpExpression(name, index), Operator.Plus, ParseStatement(rest)));
+            } //a[]+=
+            if (Regex.IsMatch(statement, @"^[a-zA-Z_][a-zA-Z0-9_]*\[.\]-="))
+            {
+                int split = statement.IndexOf("-=");
+                string square = statement.Substring(0, split);
+                string rest = statement.Substring(split + 2, statement.Length - split - 2);
+                split = square.IndexOf('[');
+                string name = square.Substring(0, split);
+                Expression index = ParseStatement(square.Substring(split + 1, square.Length - split - 2));
+                return new ArraySetExpression(name, index, new BinaryExpression(new ArrayLookUpExpression(name, index), Operator.Minus, ParseStatement(rest)));
+            } //a[]-=
+            if (Regex.IsMatch(statement, @"^[a-zA-Z_][a-zA-Z0-9_]*\[.\]\*="))
+            {
+                int split = statement.IndexOf("*=");
+                string square = statement.Substring(0, split);
+                string rest = statement.Substring(split + 2, statement.Length - split - 2);
+                split = square.IndexOf('[');
+                string name = square.Substring(0, split);
+                Expression index = ParseStatement(square.Substring(split + 1, square.Length - split - 2));
+                return new ArraySetExpression(name, index, new BinaryExpression(new ArrayLookUpExpression(name, index), Operator.Times, ParseStatement(rest)));
+            } //a[]*=
+            if (Regex.IsMatch(statement, @"^[a-zA-Z_][a-zA-Z0-9_]*\[.\]/="))
+            {
+                int split = statement.IndexOf("/=");
+                string square = statement.Substring(0, split);
+                string rest = statement.Substring(split + 2, statement.Length - split - 2);
+                split = square.IndexOf('[');
+                string name = square.Substring(0, split);
+                Expression index = ParseStatement(square.Substring(split + 1, square.Length - split - 2));
+                return new ArraySetExpression(name, index, new BinaryExpression(new ArrayLookUpExpression(name, index), Operator.Divide, ParseStatement(rest)));
+            } //a[]/=
+            #endregion
 
+            #region Operators
             string[] arr = SplitOn(statement, "\\|\\|");
             if(arr.Length > 1) return BuildTree(arr);
 
@@ -252,31 +369,61 @@ namespace PQLang
 
             arr = SplitOn(arr.First(), new string[] { "!", "-", "\\+", "sqrt", "floor", "ceil" }); //unary
             if (arr.Length > 1) return BuildTree(arr);
+            #endregion
 
+            if (Regex.IsMatch(statement, @"\.[a-zA-Z_][a-zA-Z0-9_]*=[^=].*$"))
+            {
+                int split = statement.IndexOf('=');
+                string pre = statement.Substring(0, split);
+                int splitPre = pre.LastIndexOf('.');
+                string before = pre.Substring(0, splitPre);
+                string name = pre.Substring(splitPre + 1, pre.Length - splitPre - 1);
+                string rest = statement.Substring(split + 1, statement.Length - split - 1);
+                return new ClassSetFieldExpression(ParseStatement(before), name, ParseStatement(rest));
+            } //AssignField
+            if (Regex.IsMatch(statement, @"\.[a-zA-Z_][a-zA-Z0-9_]*$"))
+            {
+                int split = statement.LastIndexOf('.');
+                string before = statement.Substring(0, split);
+                string name = statement.Substring(split + 1, statement.Length - split - 1);
+                string rest = statement.Substring(split + 1, statement.Length - split - 1);
+                return new ClassGetFieldExpression(ParseStatement(before), name);
+            } //GetField
+            if (Regex.IsMatch(statement, @"\.[a-zA-Z_][a-zA-Z0-9_]*\(.*\)$"))
+            {
+                int split = statement.LastIndexOf('.');
+                string obj = statement.Substring(0, split);
+                string func = statement.Substring(split + 1, statement.Length - split - 1);
+
+                split = func.IndexOf('(');
+                string name = func.Substring(0, split);
+                string rest = func.Substring(split + 1, func.Length - split - 2);
+
+                Expression[] args = SplitOn(rest, ",").Where(a => a != ",").Select(a => ParseStatement(a)).ToArray();
+
+                return new ClassCallMethodExpression(ParseStatement(obj), name, args);
+            } //ClassAccesMethod
             if (CheckValidName(statement)) return new VariableLookupExpression(statement);
             if (statement.StartsWith("\"") && statement.EndsWith("\"")) return new PrimitiveExpression(new String(statement.Substring(1, statement.Length-2)));
             if (Regex.IsMatch(statement, @"^[0-9]+$|^[0-9]+\.[0-9]+$")) {
                 return new PrimitiveExpression(new Number(float.Parse(statement)));
             }
-            if (Regex.IsMatch(statement, @"^[a-zA-Z_][a-zA-Z0-9_]+$")) return new VariableLookupExpression(statement);
-            if (statement.StartsWith("(") && statement.EndsWith(")")) return ParseStatement(statement.Substring(1, statement.Length - 2));
-            if (statement.EndsWith(")"))
+            if (Regex.IsMatch(statement, @"^[a-zA-Z_][a-zA-Z0-9_]*\[.+\]="))
             {
-                string fName = "";
-                while (!statement.StartsWith("(")) {
-                    fName += statement.First();
-                    statement = statement.Substring(1);
-                }
-
-                string argString = statement.Substring(1, statement.Length - 1);
-                string[] args = argString == "" ? new string[0] : argString.Split(',', StringSplitOptions.TrimEntries);
-                Expression[] argExps = new Expression[args.Length];
-                for (int i = 0; i < args.Length; i++)
-                {
-                    argExps[i] = ParseStatement(args[i]);
-                }
-                return new FunctionCallExpression(fName, argExps);
-            }
+                int split = statement.IndexOf('[');
+                string name = statement.Substring(0, split);
+                var index = NextParan(statement.Substring(split, statement.Length - split), '[');
+                return new ArraySetExpression(name, ParseStatement(index.paran.Substring(1, index.paran.Length - 2)), ParseStatement(index.rest.Substring(1)));
+            } //Array set
+            if (Regex.IsMatch(statement, @"^[a-zA-Z_][a-zA-Z0-9_]*\[.+\]$"))
+            {
+                int split = statement.IndexOf('[');
+                string name = statement.Substring(0, split);
+                string rest = statement.Substring(split + 1, statement.Length - split - 2);
+                return new ArrayLookUpExpression(name, ParseStatement(rest));
+            } //Array lookup
+            if (Regex.IsMatch(statement, @"^[a-zA-Z_][a-zA-Z0-9_]+$")) return new VariableLookupExpression(statement); //VarLookUp
+            if (statement.StartsWith("(") && statement.EndsWith(")")) return ParseStatement(statement.Substring(1, statement.Length - 2)); //Paran
 
             throw new PQLangParseError("Could not parse: " + statement);
         }
@@ -361,11 +508,22 @@ namespace PQLang
             {
                 string match = separators.Where(s => Regex.IsMatch(input, "^" + s) && (cond == "" || Regex.IsMatch(temp, cond))).FirstOrDefault("");
                 if (match == "") return;
-                string trimMatch = match.Replace("\\", "");
+
+                string altMatch = input.Substring(0, 2);
+                if (match.Length == 1 && input.Length > 1 &&  separators.Contains(altMatch))
+                {
+                    match = altMatch;
+                    input = input.Substring(2);
+                }
+                else
+                {
+                    match = match.Replace("\\", "");
+                    input = input.Substring(match.Length);
+                }
 
                 result.Add(temp);
-                result.Add(trimMatch);
-                input = input.Substring(trimMatch.Length);
+                result.Add(match);
+                
                 if(input.StartsWith("(")) depth++;
                 temp = "";
             }
@@ -377,7 +535,7 @@ namespace PQLang
         {
             input = input.Substring(1);
             List<string> statements = new();
-
+            
             string temp = "";
             bool inString = false;
             bool inBlockStatement = false;
@@ -385,6 +543,7 @@ namespace PQLang
             int curlyDepth = 0;
             int braceDepth = 0;
             int funcs = 0;
+            int classes = 0;
 
             while (input.Length > 1)
             {
@@ -440,9 +599,14 @@ namespace PQLang
             {
                 temp = temp.TrimEnd(';');
 
-                if (temp.StartsWith("fun"))
+                if (temp.StartsWith("class"))
                 {
-                    statements.Insert(funcs, temp);
+                    statements.Insert(classes, temp);
+                    classes++;
+                }
+                else if (temp.StartsWith("fun"))
+                {
+                    statements.Insert(funcs + classes, temp);
                     funcs++;
                 }
                 else
