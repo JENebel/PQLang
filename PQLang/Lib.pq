@@ -6,9 +6,9 @@
 		arr[count] = item;
 			count++;
 
-		if (arr.size == count) {
+		if (arr.length == count) {
 			//Copy elements to new array
-			newArr = [arr.size * 2];
+			newArr = [arr.length * 2];
 
 			for(i = 0; i < count; i++) {
 				newArr[i] = arr[i]
@@ -18,7 +18,7 @@
 	}
 
 	fun removeAt(index) {
-		if (index < 0 || index >= count) { error("index out of bounds") };
+		if (index < 0 || index >= count) { error("Index out of bounds") };
 
 		for (i = index; i < count; i++) {
 			if( i != 0) {
@@ -28,9 +28,9 @@
 
 		count--;
 
-		if (count < (arr.size / 4) && count != 0) {
+		if (count < (arr.length / 4) && count != 0) {
 			//Halve capacity
-			newArr = [floor(arr.size / 2)];
+			newArr = [floor(arr.length / 2)];
 
 			for(i = 0; i < count; i++) {
 				newArr[i] = arr[i]
@@ -40,12 +40,12 @@
 	}
 
 	fun set(index, value) {
-		if (index < 0 || index >= count) { error("index out of bounds") };
+		if (index < 0 || index >= count) { error("Index out of bounds") };
 		arr[index] = value
 	}
 
 	fun get(index) {
-		if (index < 0 || index >= count) { error("index out of bounds") };
+		if (index < 0 || index >= count) { error("Index out of bounds") };
 		arr[index]
 	}
 

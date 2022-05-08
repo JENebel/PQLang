@@ -14,7 +14,7 @@ namespace PQLang
 {
     internal static class Parser
     {
-        private static readonly string[] keywords = { "true", "false", "while", "fun", "if", "else", "print", "sqrt", "for", "floor", "ceil", "break", "return", "class", "new", "type", "error", "read" };
+        private static readonly string[] reserve = { "true", "false", "while", "fun", "if", "else", "print", "sqrt", "for", "floor", "ceil", "break", "return", "class", "new", "type", "error", "read" };
         private static readonly string[] blockKeywords = { "while", "for", "fun", "else", "{", "class" }; //Note special case for if
 
         public static BlockExpression Parse(string programName, List<string> includedLibs = null)
@@ -108,7 +108,7 @@ namespace PQLang
 
         private static bool CheckValidName(string name)
         {
-            return Regex.IsMatch(name, @"^[a-zA-Z_][a-zA-Z0-9_]*$") && !keywords.Contains(name);
+            return Regex.IsMatch(name, @"^[a-zA-Z_][a-zA-Z0-9_]*$") && !reserve.Contains(name);
         }
 
         private static Expression ParseStatement(string statement)
@@ -186,8 +186,8 @@ namespace PQLang
 
                 Expression body = ParseBlock(args.rest);
 
-                return new FunctionDefinitionExpression(name, argNames, body);
-            } //ClassDef
+                return new FunctionDefinitionExpression(name + "(" + argNames.Length + ")", argNames, body);
+            } //FunDef
             if (statement.StartsWith("class "))
             {
                 string trimmed = statement.Substring(6);
@@ -214,7 +214,7 @@ namespace PQLang
                 if (body is not BlockExpression) body = new BlockExpression(new List<Expression>() { body });
 
                 return new ClassDefinitionExpression(name, argNames, (BlockExpression)body);
-            } //FunDef
+            } //ClassDef
             if (statement.StartsWith("new "))
             {
                 //find arg names
@@ -377,7 +377,7 @@ namespace PQLang
 
                 Expression[] args = SplitOn(rest, ",").Where(a => a != ",").Select(a => ParseStatement(a)).ToArray();
 
-                return new FunctionCallExpression(name, args);
+                return new FunctionCallExpression(name + "(" + args.Length + ")", args);
             } //FunCall
             if (Regex.IsMatch(statement, @"\.[a-zA-Z_][a-zA-Z0-9_]*=[^=].*$"))
             {
@@ -409,7 +409,7 @@ namespace PQLang
 
                 Expression[] args = SplitOn(rest, ",").Where(a => a != ",").Select(a => ParseStatement(a)).ToArray();
 
-                return new ClassCallMethodExpression(ParseStatement(obj), name, args);
+                return new ClassCallMethodExpression(ParseStatement(obj), name + "(" + args.Length + ")", args);
             } //ClassAccesMethod
             if (CheckValidName(statement)) return new VariableLookupExpression(statement);
             if (statement.StartsWith("\"") && statement.EndsWith("\"")) return new PrimitiveExpression(new String(statement.Substring(1, statement.Length-2)));

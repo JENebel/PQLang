@@ -20,11 +20,14 @@ namespace PQLang
 
             try
             {
+                
                 Stopwatch stopwatch = new Stopwatch();
+                long baseSize = GC.GetTotalMemory(false);
                 stopwatch.Start();
                 Expression parsed = Parser.Parse(program);
                 stopwatch.Stop();
                 Console.WriteLine("Succesfully parsed in " + stopwatch.ElapsedMilliseconds + "ms");
+                Console.WriteLine("Program size in RAM: ~" + ((GC.GetTotalMemory(false) - baseSize)/128)/1024 + "mb");
                 Console.WriteLine("-------------------------------");
                 Console.WriteLine();
 

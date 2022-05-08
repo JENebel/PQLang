@@ -715,8 +715,13 @@ namespace PQLang.Interpreter
         public override Primitive Evaluate(Dictionary<string, Primitive> varEnv, Dictionary<string, FunctionDefinitionExpression> funEnv, Dictionary<string, ClassDefinitionExpression> classEnv)
         {
             Primitive rawObj = _objectExp.Evaluate(varEnv, funEnv, classEnv);
+
+            //Special cases
             if (_fieldName == "type") return new String(rawObj.Type());
-            if (rawObj is Array && _fieldName.ToLower() == "size") return new Number(((Array)rawObj).Values.Length);
+            if (rawObj is Array && _fieldName == "length") return new Number(((Array)rawObj).Values.Length);
+            if (rawObj is String && _fieldName == "length") return new Number(((String)rawObj).Value.Length);
+
+
             if (rawObj is not Object) throw new PQLangError("Can only acces fields on objects. Got " + rawObj.Type());
             Object obj = (Object)rawObj;
 
