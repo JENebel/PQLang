@@ -2,12 +2,9 @@
 
 list = new List();
 
-for(i=0; i<5; i++)
+for(i=0; i<100000; i++)
 {
-	list.add(i);
+	list.add(i)
 }
 
-
-
-list.get(0).add(4);
-list.get(0).toString()
+list.size()

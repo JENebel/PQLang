@@ -1,6 +1,5 @@
-﻿class List()
-{
-	arr = [2];
+﻿class List() {
+	arr = [4];
 	count = 0;
 
 	fun add(item) {
@@ -18,8 +17,7 @@
 		}
 	}
 
-	fun removeAt(index)
-	{
+	fun removeAt(index) {
 		if (index < 0 || index >= count) { error("index out of bounds") };
 
 		for (i = index; i < count; i++) {
@@ -30,9 +28,9 @@
 
 		count--;
 
-		if (count < arr.size / 4 && count != 0) {
+		if (count < (arr.size / 4) && count != 0) {
 			//Halve capacity
-			newArr = [arr.size / 2];
+			newArr = [floor(arr.size / 2)];
 
 			for(i = 0; i < count; i++) {
 				newArr[i] = arr[i]

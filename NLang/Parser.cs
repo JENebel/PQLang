@@ -61,14 +61,21 @@ namespace PQLang
         private static (string program, string[] libs) PrepareProgram(string input)
         {
             string output = "";
-
+            bool inComment = false;
             bool inString = false;
+
             for (int i = 0; i < input.Length; i++)
             {
                 if (input[i] == '"' && i > 0 && !(input[i - 1] == '\\' && inString))
                     inString = !inString;
+                else if (i + 1 < input.Length && input[i] == '/' && input[i + 1] == '*')
+                    inComment = true;
+                else if (i + 1 < input.Length && input[i] == '*' && input[i + 1] == '/')
+                {
+                    i += 2;
+                }
 
-                if (!Char.IsWhiteSpace(input[i]) || inString || ((output.EndsWith("fun") || output.EndsWith("return") || output.EndsWith("class") || output.EndsWith("new")) && input[i] == ' '))
+                if (!inComment && (!Char.IsWhiteSpace(input[i]) || inString || ((output.EndsWith("fun") || output.EndsWith("return") || output.EndsWith("class") || output.EndsWith("new")) && input[i] == ' ')))
                 {
                     output += input[i];
                 }
@@ -232,17 +239,6 @@ namespace PQLang
             {
                 return new PrimitiveExpression(new Return(new PrimitiveExpression(new Void())));
             } //Return
-            if (Regex.IsMatch(statement, @"^[a-zA-Z_][a-zA-Z0-9_]*\("))
-            {
-                //find arg names
-                int split = statement.IndexOf('(');
-                string name = statement.Substring(0, split);
-                string rest = statement.Substring(split + 1, statement.Length - split - 2);
-
-                Expression[] args = SplitOn(rest, ",").Where(a => a != ",").Select(a => ParseStatement(a)).ToArray();
-
-                return new FunctionCallExpression(name, args);
-            } //FunCall
             if (Regex.IsMatch(statement, @"^[a-zA-Z_][a-zA-Z0-9_]*=[^=]"))
             {
                 int split = statement.IndexOf('=');
@@ -371,6 +367,17 @@ namespace PQLang
             if (arr.Length > 1) return BuildTree(arr);
             #endregion
 
+            if (Regex.IsMatch(statement, @"^[a-zA-Z_][a-zA-Z0-9_]*\("))
+            {
+                //find arg names
+                int split = statement.IndexOf('(');
+                string name = statement.Substring(0, split);
+                string rest = statement.Substring(split + 1, statement.Length - split - 2);
+
+                Expression[] args = SplitOn(rest, ",").Where(a => a != ",").Select(a => ParseStatement(a)).ToArray();
+
+                return new FunctionCallExpression(name, args);
+            } //FunCall
             if (Regex.IsMatch(statement, @"\.[a-zA-Z_][a-zA-Z0-9_]*=[^=].*$"))
             {
                 int split = statement.IndexOf('=');
@@ -509,10 +516,9 @@ namespace PQLang
                 string match = separators.Where(s => Regex.IsMatch(input, "^" + s) && (cond == "" || Regex.IsMatch(temp, cond))).FirstOrDefault("");
                 if (match == "") return;
 
-                string altMatch = input.Substring(0, 2);
-                if (match.Length == 1 && input.Length > 1 &&  separators.Contains(altMatch))
+                if (match.Length == 1 && input.Length > 1 &&  separators.Contains(input.Substring(0, 2)))
                 {
-                    match = altMatch;
+                    match = input.Substring(0, 2);
                     input = input.Substring(2);
                 }
                 else
