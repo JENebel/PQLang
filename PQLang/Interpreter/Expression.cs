@@ -541,6 +541,21 @@ namespace PQLang.Interpreter
         }
     }
 
+    internal class ReadExpression : Expression
+    {
+        public override Primitive Evaluate(Dictionary<string, Primitive> varEnv, Dictionary<string, FunctionDefinitionExpression> funEnv, Dictionary<string, ClassDefinitionExpression> classEnv)
+        {
+            string str = Console.ReadLine();
+
+            return new String(str == null ? "" : str);
+        }
+
+        public override string Unparse()
+        {
+            return "read";
+        }
+    }
+
     internal class ForLoopExpression : Expression
     {
         AssignmentExpression _assign;

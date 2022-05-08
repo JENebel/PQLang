@@ -14,7 +14,7 @@ namespace PQLang
 {
     internal static class Parser
     {
-        private static readonly string[] keywords = { "while", "fun", "if", "else", "print", "sqrt", "for", "floor", "ceil", "break", "return", "class", "new", "type", "error" };
+        private static readonly string[] keywords = { "true", "false", "while", "fun", "if", "else", "print", "sqrt", "for", "floor", "ceil", "break", "return", "class", "new", "type", "error", "read" };
         private static readonly string[] blockKeywords = { "while", "for", "fun", "else", "{", "class" }; //Note special case for if
 
         public static BlockExpression Parse(string programName, List<string> includedLibs = null)
@@ -115,6 +115,7 @@ namespace PQLang
         {
             if (statement == "true") return new PrimitiveExpression(new Boolean(true));
             if (statement == "false") return new PrimitiveExpression(new Boolean(false));
+            if (statement == "read") return new ReadExpression();
             if (statement == "break") return new PrimitiveExpression(new Break());
             if (statement.StartsWith("[") && statement.EndsWith("]"))
             {
