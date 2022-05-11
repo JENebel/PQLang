@@ -8,6 +8,9 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <None Update="IO.pq">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <None Update="Lib.pq">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>

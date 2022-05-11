@@ -1,1 +1,7 @@
-﻿abc(87, 67)
+﻿import Math;
+import IO;
+import Lib;
+
+
+
+PrintProgram();

@@ -208,28 +208,22 @@ namespace PQLang.Interpreter
     internal class Object : Primitive
     {
         public Dictionary<string, Primitive> VarEnv { get; set; }
-        public Dictionary<string, FunctionDefinitionExpression> FunEnv { get; set; }
-        public Dictionary<string, ClassDefinitionExpression> ClassEnv { get; set; }
         public string ClassName { get; set; }
 
-        public Object(string className, Dictionary<string, Primitive> varEnv, Dictionary<string, FunctionDefinitionExpression> funEnv, Dictionary<string, ClassDefinitionExpression> classEnv)
+        public Object(string className, Dictionary<string, Primitive> varEnv)
         {
             VarEnv = varEnv;
-            FunEnv = funEnv;
-            ClassEnv = classEnv;
             ClassName = className;
         }
 
         public override Primitive Copy()
         {
-            return new Object(ClassName, Expression.Copy(VarEnv), FunEnv, ClassEnv);
+            return new Object(ClassName, Expression.Copy(VarEnv));
         }
 
         public override void Mutate(Primitive newValue)
         {
             VarEnv = Expression.Copy(((Object)newValue).VarEnv);
-            FunEnv = Expression.Copy(((Object)newValue).FunEnv);
-            ClassEnv = Expression.Copy(((Object)newValue).ClassEnv);
             ClassName = ((Object)newValue).ClassName;
         }
 

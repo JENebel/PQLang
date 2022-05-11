@@ -1,4 +1,5 @@
-﻿fun Pow(a, b)
+﻿class Math(){
+fun Pow(a, b)
 {
 	if(b == 0 && a > 0) {return 1}
 	if(b == 0 && a < 0) {return -1}
@@ -17,10 +18,11 @@
 
 fun Abs(a)
 {
-	if(a < 0) {-a} else {a}
+	if(a < 0) {-a} else {"a"}
 }
 
 fun Round(a)
 {
 	if(a % 1 < 0.5) {floor a} else {ceil a}
+}
 }

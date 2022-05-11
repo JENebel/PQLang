@@ -14,7 +14,7 @@ namespace PQLang
 {
     internal static class Parser
     {
-        private static readonly string[] reserve = { "true", "false", "while", "fun", "if", "else", "print", "sqrt", "for", "floor", "ceil", "break", "return", "class", "new", "type", "error", "read" };
+        private static readonly string[] reserve = { "true", "false", "while", "fun", "if", "else", "print", "sqrt", "for", "floor", "ceil", "break", "return", "class", "new", "type", "error", "read", "interopFunction" };
         private static readonly string[] blockKeywords = { "while", "for", "fun", "else", "{", "class" }; //Note special case for if
 
         public static BlockExpression Parse(string programName, List<string> includedLibs = null)
@@ -158,6 +158,14 @@ namespace PQLang
             {
                 return new PrintExpression(ParseStatement(statement.Substring(6, statement.Length - 7)));
             } //print
+            if (statement.StartsWith("interopFunction("))
+            {
+                string[] args = SplitOn(statement.Substring(16, statement.Length - 17), ",").Where(a => a != ",").ToArray();
+
+                var exps = args.Skip(1).Select(a => ParseStatement(a)).ToList();
+
+                return new InteropExpression(args[0].Substring(1, args[0].Length - 2), exps);
+            } //interop
             if (statement.StartsWith("error("))
             {
                 return new ErrorExpression(ParseStatement(statement.Substring(6, statement.Length - 7)));
@@ -399,20 +407,22 @@ namespace PQLang
             } //GetField
             if (Regex.IsMatch(statement, @"\.[a-zA-Z_][a-zA-Z0-9_]*\(.*\)$"))
             {
-                int split = statement.LastIndexOf('.');
-                string obj = statement.Substring(0, split);
-                string func = statement.Substring(split + 1, statement.Length - split - 1);
+                int parOp = statement.IndexOf('(');
+                int split = statement.Substring(parOp).LastIndexOf('.');
+                string obj = statement.Substring(0, split -2 );
+                string func = statement.Substring(split-1, statement.Length - split);
 
                 split = func.IndexOf('(');
                 string name = func.Substring(0, split);
-                string rest = func.Substring(split + 1, func.Length - split - 2);
+                string rest = func.Substring(split + 1, func.Length - split - 1);
 
                 Expression[] args = SplitOn(rest, ",").Where(a => a != ",").Select(a => ParseStatement(a)).ToArray();
 
                 return new ClassCallMethodExpression(ParseStatement(obj), name + "(" + args.Length + ")", args);
             } //ClassAccesMethod
             if (CheckValidName(statement)) return new VariableLookupExpression(statement);
-            if (statement.StartsWith("\"") && statement.EndsWith("\"")) return new PrimitiveExpression(new String(statement.Substring(1, statement.Length-2)));
+            if (statement.StartsWith("\"") && statement.EndsWith("\"")) 
+                return new PrimitiveExpression(new String(statement.Substring(1, statement.Length-2)));
             if (Regex.IsMatch(statement, @"^[0-9]+$|^[0-9]+\.[0-9]+$")) {
                 return new PrimitiveExpression(new Number(float.Parse(statement)));
             }
@@ -557,7 +567,7 @@ namespace PQLang
                 temp += input.First();
                 input = input.Substring(1);
 
-                if (temp.Last() == '"' && !(temp[temp.Length - 2] == '\\' && inString))
+                if (temp.Last() == '"' && !(temp.Length > 2 && temp[temp.Length - 2] == '\\' && inString))
                     inString = !inString;
                 else if (temp.Last() == '(' && !inString)
                     braceDepth++;

@@ -173,7 +173,7 @@ namespace PQLang.Interpreter
                     Operator.Modulo => new Number(l.Value % r.Value),
                     Operator.GreaterEqual => new Boolean(l.Value >= r.Value),
                     Operator.LessEqual => new Boolean(l.Value <= r.Value),
-                    _ => throw new PQLangError("Operator " + _op.ToString() + " not valid for 2 Integers")
+                    _ => throw new PQLangError("Operator " + _op.ToString() + " not valid for 2 Numbers")
                 },
 
                 (Boolean l, Boolean r) => _op switch
@@ -182,7 +182,14 @@ namespace PQLang.Interpreter
                     Operator.NotEquals => new Boolean(l.Value != r.Value),
                     Operator.And => new Boolean(l.Value && r.Value),
                     Operator.Or => new Boolean(l.Value || r.Value),
-                    _ => throw new PQLangError("Operator " + _op.ToString() + " not valid for 2 Booleans")
+                    _ => throw new PQLangError("Operator " + _op.ToString() + " not valid for 2 Numbers")
+                },
+
+                (String l, String r) => _op switch
+                {
+                    Operator.Equals => new Boolean(l.Value == r.Value),
+                    Operator.NotEquals => new Boolean(l.Value != r.Value),
+                    _ => throw new PQLangError("Operator " + _op.ToString() + " not valid for 2 Strings")
                 },
 
                 //String concat
@@ -200,6 +207,7 @@ namespace PQLang.Interpreter
                 _ => _op switch
                 {
                     Operator.Equals => new Boolean(false),
+                    Operator.NotEquals => new Boolean(true),
                     _ => throw new PQLangError("Operator " + _op.ToString() + " not valid for " + leftVal.Type() + " and " + rightVal.Type())
                 }
             };
@@ -446,18 +454,18 @@ namespace PQLang.Interpreter
 
     internal class BlockExpression : Expression
     {
-        List<Expression> _body;
+        public List<Expression> Expressions { get; set; }
 
         public BlockExpression(List<Expression> body)
         {
-            _body = body;
+            Expressions = body;
         }
 
         public List<FunctionDefinitionExpression> Functions 
         { 
             get 
             { 
-                return _body.Where(e => e is FunctionDefinitionExpression).Select(e => (FunctionDefinitionExpression)e).ToList();
+                return Expressions.Where(e => e is FunctionDefinitionExpression).Select(e => (FunctionDefinitionExpression)e).ToList();
             } 
         }
 
@@ -465,7 +473,7 @@ namespace PQLang.Interpreter
         {
             get
             {
-                return _body.Where(e => e is ClassDefinitionExpression).Select(e => (ClassDefinitionExpression)e).ToList();
+                return Expressions.Where(e => e is ClassDefinitionExpression).Select(e => (ClassDefinitionExpression)e).ToList();
             }
         }
 
@@ -492,18 +500,18 @@ namespace PQLang.Interpreter
 
             Dictionary<string, ClassDefinitionExpression> classDefs = new();
 
-            while (_body.Count() > 0 && _body.First() is ClassDefinitionExpression)
+            while (Expressions.Count() > 0 && Expressions.First() is ClassDefinitionExpression)
             {
-                _body.First().Evaluate(newVarEnv, newFunEnv, newClassEnv);
-                classDefs.Add(((ClassDefinitionExpression)_body.First()).ClassName, (ClassDefinitionExpression)_body.First());
-                _body.RemoveAt(0);
+                Expressions.First().Evaluate(newVarEnv, newFunEnv, newClassEnv);
+                classDefs.Add(((ClassDefinitionExpression)Expressions.First()).ClassName, (ClassDefinitionExpression)Expressions.First());
+                Expressions.RemoveAt(0);
             }
             foreach (var def in classDefs.Values)
             {
                 def.ClassEnv = classDefs;
             }
 
-            foreach (Expression expression in _body)
+            foreach (Expression expression in Expressions)
             {
                 result = expression.Evaluate(newVarEnv, newFunEnv, newClassEnv);
                 if (result is Return) 
@@ -515,7 +523,7 @@ namespace PQLang.Interpreter
 
         public override string Unparse()
         {
-            return "{" + string.Join(";\n", _body.Select(exp => exp.Unparse())) + "}";
+            return "{" + string.Join(";\n", Expressions.Select(exp => exp.Unparse())) + "}";
         }
     }
 
@@ -610,6 +618,7 @@ namespace PQLang.Interpreter
         public BlockExpression Body { get; private set; }
         public string[] Arguments { get; }
         public Dictionary<string, ClassDefinitionExpression> ClassEnv { get; set;}
+        public Dictionary<string, FunctionDefinitionExpression> FunEnv { get; set; }
 
         public ClassDefinitionExpression(string name, string[] arguments, BlockExpression body)
         {
@@ -617,11 +626,20 @@ namespace PQLang.Interpreter
             Body = body;
             Arguments = arguments;
             ClassEnv = new();
+            FunEnv = new();
         }
 
         public override Primitive Evaluate(Dictionary<string, Primitive> varEnv, Dictionary<string, FunctionDefinitionExpression> funEnv, Dictionary<string, ClassDefinitionExpression> classEnv)
         {
             if (classEnv.ContainsKey(ClassName)) throw new PQLangError("Class \"" + ClassName + "\" already exists");
+
+            var funDefs = Body.Expressions.Where(e => e is FunctionDefinitionExpression);
+            foreach(var def in funDefs)
+            {
+                def.Evaluate(new(), FunEnv, ClassEnv);
+            }
+
+            Body.Expressions = Body.Expressions.SkipWhile(e => e is ClassDefinitionExpression || e is FunctionDefinitionExpression).ToList();
 
             classEnv.Add(ClassName, this);
 
@@ -652,16 +670,15 @@ namespace PQLang.Interpreter
             if (klass.Arguments.Length != _arguments.Length) throw new PQLangError("Expected " + klass.Arguments.Length + " arguments for constructor for \"" + _className + "\" but got " + _arguments.Length);
 
             Dictionary<string, Primitive> newVarEnv = new();
-            Dictionary<string, FunctionDefinitionExpression> newFunEnv = new();
 
             for (int i = 0; i < _arguments.Count(); i++)
             {
-                newVarEnv[klass.Arguments[i]] = _arguments[i].Evaluate(newVarEnv, newFunEnv, klass.ClassEnv);
+                newVarEnv[klass.Arguments[i]] = _arguments[i].Evaluate(newVarEnv, klass.FunEnv, klass.ClassEnv);
             }
 
-            klass.Body.Evaluate(newVarEnv, newFunEnv, klass.ClassEnv, false);
+            klass.Body.Evaluate(newVarEnv, klass.FunEnv, klass.ClassEnv, false);
 
-            return new Object(_className, newVarEnv, newFunEnv, klass.ClassEnv);
+            return new Object(_className, newVarEnv);
         }
 
         public override string Unparse()
@@ -688,9 +705,10 @@ namespace PQLang.Interpreter
             Primitive rawObj = _objectExp.Evaluate(varEnv, funEnv, classEnv);
             if (!(rawObj is Object)) throw new PQLangError("Can only acces fields on objects. Got " + rawObj.Type());
             Object obj = (Object)rawObj;
+            var klass = classEnv[obj.ClassName];
 
             AssignmentExpression ass = new AssignmentExpression(_fieldName, _newVal);
-            ass.Evaluate(obj.VarEnv, obj.FunEnv, obj.ClassEnv);
+            ass.Evaluate(obj.VarEnv, klass.FunEnv, klass.ClassEnv);
 
             return new Void();
         }
@@ -724,9 +742,10 @@ namespace PQLang.Interpreter
 
             if (rawObj is not Object) throw new PQLangError("Can only acces fields on objects. Got " + rawObj.Type());
             Object obj = (Object)rawObj;
+            var klass = classEnv[obj.ClassName];
 
             VariableLookupExpression look = new VariableLookupExpression(_fieldName);
-            return look.Evaluate(obj.VarEnv, obj.FunEnv, obj.ClassEnv);
+            return look.Evaluate(obj.VarEnv, klass.FunEnv, klass.ClassEnv);
         }
 
         public override string Unparse()
@@ -753,9 +772,10 @@ namespace PQLang.Interpreter
             Primitive rawObj = _objectExp.Evaluate(varEnv, funEnv, classEnv);
             if (!(rawObj is Object)) throw new PQLangError("Can only acces methods on objects. Got " + rawObj.Type());
             Object obj = (Object)rawObj;
+            var klass = classEnv[obj.ClassName];
 
-            if (!obj.FunEnv.ContainsKey(_funName)) throw new PQLangError(obj.ClassName + " Does not contain method \"" + _funName + "\"");
-            FunctionDefinitionExpression func = obj.FunEnv[_funName];
+            if (!klass.FunEnv.ContainsKey(_funName)) throw new PQLangError(obj.ClassName + " Does not contain method \"" + _funName + "\"");
+            FunctionDefinitionExpression func = klass.FunEnv[_funName];
             if (func.Arguments.Length != _arguments.Length) throw new PQLangError("Expected " + func.Arguments.Length + " arguments for method \"" + _funName + "\" but got " + _arguments.Length);
 
             var newVarEnv = obj.VarEnv;
@@ -765,7 +785,7 @@ namespace PQLang.Interpreter
                 newVarEnv[func.Arguments[i]] = _arguments[i].Evaluate(varEnv, funEnv, classEnv);
             }
 
-            var result = func.Body.Evaluate(newVarEnv, obj.FunEnv, obj.ClassEnv);
+            var result = func.Body.Evaluate(newVarEnv, klass.FunEnv, klass.ClassEnv);
             if (result is Return) result = ((Return)result).Value.Evaluate(varEnv, funEnv, classEnv);
             return result;
         }
@@ -793,6 +813,126 @@ namespace PQLang.Interpreter
         public override string Unparse()
         {
             return "error(" + _message.Unparse() + ");";
+        }
+    }
+
+    internal class InteropExpression : Expression
+    {
+        List<Expression> _arguments;
+        string _function;
+
+        public InteropExpression(string function, List<Expression> arguments)
+        {
+            _arguments = arguments;
+            _function = function;
+        }
+
+        public override Primitive Evaluate(Dictionary<string, Primitive> varEnv, Dictionary<string, FunctionDefinitionExpression> funEnv, Dictionary<string, ClassDefinitionExpression> classEnv)
+        {
+            List<Primitive> arguments = _arguments.Select(a => a.Evaluate(varEnv, funEnv, classEnv)).ToList();
+
+            try
+            {
+                if (_function == "fileReadLines")
+                {
+                    if (arguments.Count == 1 && arguments[0] is String)
+                    {
+                        string[] lines = File.ReadAllLines(((String)arguments[0]).Value);
+                        return new Array(lines.Length) { Values = lines.Select(v => new String(v)).ToArray() };
+                    }
+                }
+                if (_function == "fileWriteLines")
+                {
+                    if (arguments.Count == 2 && arguments[0] is String && arguments[1] is Array)
+                    {
+                        File.WriteAllLines(((String)arguments[0]).Value, ((Array)arguments[1]).Values.Select(v => v.ToString()).ToArray());
+                        return new Boolean(true);
+                    }
+                }
+                if (_function == "fileWriteText")
+                {
+                    if (arguments.Count == 2 && arguments[0] is String && arguments[1] is String)
+                    {
+                        File.WriteAllText(((String)arguments[0]).Value, ((String)arguments[1]).Value);
+                        return new Boolean(true);
+                    }
+                }
+                if (_function == "fileAppendLines")
+                {
+                    if (arguments.Count == 2 && arguments[0] is String && arguments[1] is Array)
+                    {
+                        File.AppendAllLines(((String)arguments[0]).Value, ((Array)arguments[1]).Values.Select(v => v.ToString()).ToArray());
+                        return new Boolean(true);
+                    }
+                }
+                if (_function == "fileAppendText")
+                {
+                    if (arguments.Count == 2 && arguments[0] is String && arguments[1] is String)
+                    {
+                        File.AppendAllText(((String)arguments[0]).Value, ((String)arguments[1]).Value);
+                        return new Boolean(true);
+                    }
+                }
+                if (_function == "createFile")
+                {
+                    if (arguments.Count == 1 && arguments[0] is String)
+                    {
+                        File.Create(((String)arguments[0]).Value);
+                        return new Boolean(true);
+                    }
+                }
+                if (_function == "deleteFile")
+                {
+                    if (arguments.Count == 1 && arguments[0] is String)
+                    {
+                        File.Delete(((String)arguments[0]).Value);
+                        return new Boolean(true);
+                    }
+                }
+                if (_function == "createFolder")
+                {
+                    if (arguments.Count == 1 && arguments[0] is String)
+                    {
+                        Directory.CreateDirectory(((String)arguments[0]).Value);
+                        return new Boolean(true);
+                    }
+                }
+                if (_function == "deleteFolder")
+                {
+                    if (arguments.Count == 1 && arguments[0] is String)
+                    {
+                        Directory.Delete(((String)arguments[0]).Value);
+                        return new Boolean(true);
+                    }
+                }
+                if (_function == "getFileNames")
+                {
+                    if (arguments.Count == 1 && arguments[0] is String)
+                    {
+                        string[] files = Directory.GetFiles(((String)arguments[0]).Value);
+                        return new Array(files.Length) { Values = files.Select(v => new String(v)).ToArray() };
+                    }
+                }
+                if (_function == "getFolderNames")
+                {
+                    if (arguments.Count == 1 && arguments[0] is String)
+                    {
+                        string[] folders = Directory.GetDirectories(((String)arguments[0]).Value);
+                        return new Array(folders.Length) { Values = folders.Select(v => new String(v)).ToArray() };
+                    }
+                }
+            }
+            catch (Exception)
+            {
+                return new Boolean(false);
+            }
+
+            throw new PQLangError("Unknown interop function \"" + _function + "\"");
+        }
+
+        public override string Unparse()
+        {
+            return "interop(" + _arguments.Count + ");";
         }
     }
 }
